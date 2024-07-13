@@ -27,8 +27,8 @@ Infer the stellar map assuming perfect knowledge of:
 # ------------------
 
 from typing import Tuple
-from collections.abc import Callable
-from functools import partial
+# from collections.abc import Callable
+# from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -37,7 +37,7 @@ import numpy as np
 from jaxoplanet.types import Array
 
 # To generate variables ---
-import paparazzi
+# import paparazzi
 import starry
 
 from paparazzi.src.scripts.utils.generate import generate_data

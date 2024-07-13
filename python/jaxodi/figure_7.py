@@ -72,7 +72,7 @@ for n in range(map.udeg):
 
 
 ydeg = data["kwargs"]['ydeg'] # 15
-udeg = data["kwargs"]['udeg'] # 2
+udeg = data["kwargs"]['udeg'] # 2 (leaves out the 0th deg = -1)
 nc = data["kwargs"]['nc'] # 1
 veq = data["kwargs"]['veq'] # 60000
 inc = data["kwargs"]['inc'] # 40
@@ -97,10 +97,11 @@ angle_factor = np.pi/180 # converts between degrees and radians
 interp = True
 
 Si2eBlk = map._Si2eBlk # array (1120, 5616)
+S0e2i = map._S0e2i # array (603, 300)
 
-u = data["props"]["u"] # the vector of limb darkening coefficients
+u = map.u # array (3,) vector of limb darkening coefficients
 
-spectrum = spectrum_true
+spectrum = spectrum_true  # array (1,300)
 
 
 spatial_mean
@@ -111,7 +112,7 @@ cho_C
 mu
 invL
 meta["y_lin"]
-y
+y = map.y # array (256,)
 cho_ycov
 
 
@@ -198,8 +199,18 @@ def map_solve(
 # get_default_theta
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler.py#L1059
-#
+
+# how function is called in solve()
+theta = get_default_theta(kwargs.pop("theta", None))
+
+# class attributes
+_nt
+_angle_factor
+
 def get_default_theta(theta):
+
+    math.cast()
+    ops.enforce_shape()
 
     # if theta is None:
     #     theta = math.cast(
@@ -219,40 +230,33 @@ def get_default_theta(theta):
 # get_kT
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/_core/core.py#L1894
-#
+
+# how function is called in get_D_fixed_spectrum()
+get_kT(inc, theta, veq, u)
+
+# class attributes
+vsini_max
+F # not sure if function or attribute?
+A1Inv
+A1
+nt
+Ny
+nk
+
 def get_kT(inc, theta, veq, u):
     """
     Get the kernels at an array of angular phases `theta`.
     """
-    # # Compute the convolution kernels
-    # vsini = self.enforce_bounds(veq * tt.sin(inc), 0.0, self.vsini_max)
-    # x = self.get_x(vsini)
-    # rT = self.get_rT(x)
-    # kT0 = self.get_kT0(rT)
 
-    # # Compute the limb darkening operator
-    # if self.udeg > 0:
-    #     F = self.F(
-    #         tt.as_tensor_variable(u), tt.as_tensor_variable([np.pi])
-    #     )
-    #     L = ts.dot(ts.dot(self.A1Inv, F), self.A1)
-    #     kT0 = tt.dot(tt.transpose(L), kT0)
+    # many function calls
+    enforce_bounds()
+    get_x()
+    get_rT()
+    get_kT0()
+    F() #?
+    right_project()
 
-    # # Compute the kernels at each epoch
-    # kT = tt.zeros((self.nt, self.Ny, self.nk))
-    # for m in range(self.nt):
-    #     kT = tt.set_subtensor(
-    #         kT[m],
-    #         tt.transpose(
-    #             self.right_project(
-    #                 tt.transpose(kT0),
-    #                 inc,
-    #                 tt.as_tensor_variable(0.0),
-    #                 theta[m],
-    #             )
-    #         ),
-    #     )
-    # return kT
+    # many theano operations
 
     pass
 
@@ -270,22 +274,56 @@ def get_kT(inc, theta, veq, u):
 # Functions called by Figure 7's map.solve()
 # ------------------------------------------
 
-# spatial_cov
-S0e2i = map._S0e2i # array (603, 300)
-# spectral_mean
 
 # process_inputs
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L222
-#
-def process_inputs(spatial_cov, S0e2i, spectral_mean):
+
+# how function is called in solve_bilinear()
+process_inputs(flux, **kwargs)
+
+# class attributes
+Ny
+nt
+nw
+nc
+nw0 # maybe the shape of spectral_mean[n] arrays?
+S0e2i
+nw0_ # maybe a transformed version of nw0 for spectral covariance matrices?
+
+# def process_inputs(spatial_cov, S0e2i, spectral_mean):
+def process_inputs(
+        flux,
+        flux_err=None,
+        spatial_mean=None,
+        spatial_cov=None,
+        spectral_mean=None,
+        spectral_cov=None,
+        spectral_guess=None,
+        spectral_lambda=None,
+        spectral_maxiter=None,
+        spectral_eps=None,
+        spectral_tol=None,
+        spectral_method=None,
+        normalized=True,
+        baseline=None,
+        baseline_var=None,
+        fix_spectrum=False,
+        fix_map=False,
+        logT0=None,
+        logTf=None,
+        nlogT=None,
+        quiet=False,
+    ):
     """
     Checks shapes and sets defaults.
     """
 
-    # potentially calls to cho_factor and cho_solve
-    # if not spatial_cov[n].ndim < 2: then ^^
+    # if not spatial_cov[n].ndim < 2:
+    # cho_factor()
+    # cho_solve()
 
+    # is this dot function Numpy's or starry's?
     # spectral_mean[n] = S0e2i.dot(spectral_mean[n]).T
 
     pass
@@ -294,7 +332,20 @@ def process_inputs(spatial_cov, S0e2i, spectral_mean):
 # get_D_fixed_spectrum
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/_core/core.py#L1986
-#
+
+# how function is called in design_matrix()
+D = get_D_fixed_spectrum(
+    inc, theta, veq, u, spectrum
+)
+
+# class attributes
+nc
+nwp
+nt
+Ny
+nk
+nw
+
 def get_D_fixed_spectrum(inc, theta, veq, u, spectrum):
     """
     Return the Doppler matrix for a fixed spectrum.
@@ -324,7 +375,10 @@ def get_D_fixed_spectrum(inc, theta, veq, u, spectrum):
 # sparse_dot
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/_core/math.py#L218
-#
+
+# how function is called in design_matrix()
+D = math.sparse_dot(Si2eBlk, D)
+
 def sparse_dot(A, B):
     """
     Performs matrix multiplication, optimising computation time by utilising sparse matrices.
@@ -337,29 +391,33 @@ def sparse_dot(A, B):
     # else:
     #     raise ValueError("At least one input must be sparse.")
     
-    # if jax.issparse(A):
-    #     return A.dot(B)
-    # elif jax.issparse(B):
-    #     return (B.T.dot(A.T)).T
-    # else:
-    #     raise ValueError("At least one input must be sparse.")
-
-    pass
+    # Guess at jax versions:
+    if jax.issparse(A):
+        return A.dot(B)
+    elif jax.issparse(B):
+        return (B.T.dot(A.T)).T
+    else:
+        raise ValueError("At least one input must be sparse.")
 
 
 # design_matrix
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler.py#L1170
-#
-fix_spectrum
+
+# how function is called in get_S()
+map.design_matrix(
+    theta=theta/angle_factor, fix_spectrum=True
+)
+
+# class attributes
 inc
 veq
 u
 spectrum
-interp
+interp = True
 Si2eBlk
-#
-def design_matrix():
+
+def design_matrix(theta=None, fix_spectrum=None, fix_map=False):
     """
         Return the Doppler imaging design matrix.
 
@@ -374,7 +432,6 @@ def design_matrix():
     
     """
         there is much more info in the docstring
-        it is overwhelming
         havent read yet
     """
 
@@ -394,11 +451,12 @@ def design_matrix():
 #
 # S: https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L201
 # get_S: https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L124
-#
+
+# class attributes
 theta
 angle_factor
 fix_spectrum
-#
+
 def get_S():
     """
     Get design matrix conditioned on the current spectrum.
@@ -406,76 +464,141 @@ def get_S():
     return design_matrix(theta/angle_factor, fix_spectrum=True)
 
 
-
 # solve_for_map_linear
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L467
-#
+
+# how function is called in solve_bilinear()
+solve_for_map_linear()
+
+# class attributes
+spatial_mean
+spatial_inv_cov
+nc
+flux_err
+nt
+nw
+baseline
 flux
-cho_C
-mu_
-invL
-#
-def solve_for_map_linear():
+S
+Ny
+
+def solve_for_map_linear(T=1, baseline_var=0):
     """
     Solve for `y` linearly, given a baseline or unnormalised data.
     """
 
-    # ~100 lines of code that don't use theano
+    # ~60 lines of code that don't use theano
 
+    block_diag()
     # scipy.linalg.block_diag()
+
+    cho_factor()
     # cho_factor == scipy.linalg.cholesky(*args, **kwargs, lower=True)
     # == jax.scipy.linalg.cholesky(_input_, lower=True)
 
+    # can get S via call
     S = get_S()
-    # finishes by calling map_solve (already written)
+
+    #  mean, cho_ycov = greedy_linalg.solve(S, flux, cho_C, mu, invL)
     mean, cho_ycov = map_solve(S, flux, cho_C, mu, invL)
-    # a few more lines
 
     return mean, cho_ycov
+
+
+# reset
+#
+# https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L177
+
+# how function is called in solve_bilinear()
+reset()
+
+# class attributes
+spectrum
+y
+S
+C
+KT0
+meta
+
+def reset():
+
+    spectrum = None
+    y = None
+    S = None
+    C = None
+    KT0 = None
+    meta = {}
 
 
 # solve_bilinear
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L737
-#
+
+# how function is called in solve()
+solution = solve_bilinear(
+    flux, theta, y, spectrum, veq, inc, u, **kwargs
+)
+
+# class attributes
+fix_spectrum
+linear
+meta["y"]
+meta["cho_ycov"]
+meta["spectrum"]
+meta["cho_scov"]
+
 def solve_bilinear(flux, theta, y, spectrum, veq, inc, u, **kwargs):
     """
     Solve the linear problem for the spatial and/or spectral map
     given a spectral timeseries.
     """
 
+    reset()
     process_inputs(flux, **kwargs)
 
-    # if fix_spectrum:
+    # if fix_spectrum and linear: # The problem is exactly linear!
     # Solve for the map conditioned on the spectrum
-    solve_for_map_linear() # The problem is exactly linear!
+    solve_for_map_linear()
 
-    metadata = True # {y, cho_ycov, spectrum, cho_scov}
+    meta = True # {y, cho_ycov, spectrum, cho_scov}
 
-    return metadata
+    return meta
 
 
 # solve
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler.py#L1773
-#
-def solve(flux, theta, y, spectrum, veq, inc, u, **kwargs):
+
+# how function is called in paper
+soln = map.solve(
+    flux,
+    theta=theta,
+    normalized=False,
+    fix_spectrum=True,
+    flux_err=flux_err,
+)
+
+# class attributes
+y = map.y # array (256,)
+spectrum = data["truths"]["spectrum"] # array (1,300)
+veq = data["kwargs"]['veq'] # 60000
+inc = data["kwargs"]['inc'] # 40
+u = data["props"]["u"] # the vector of limb darkening coefficients
+
+def solve(flux, solver="bilinear", **kwargs):
     """
     Iteratively solves the bilinear or nonlinear problem for the spatial
     and/or spectral map given a spectral timeseries.
     """
 
-    if theta is None:
-        theta = get_default_theta(None)
-    else:
-        theta = get_default_theta(theta)
+    theta = get_default_theta(kwargs.pop("theta", None))
 
     # if bilinear
+    # if solver.lower().startswith("bi"):
     solution = solve_bilinear(
         flux, theta, y, spectrum, veq, inc, u, **kwargs
     )
-
     # else linear
     # solution = solve_nonlinear(
     #     flux, theta, y, spectrum, veq, inc, u, **kwargs

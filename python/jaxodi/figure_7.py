@@ -201,7 +201,7 @@ def map_solve(
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler.py#L1059
 
 # how function is called in solve()
-theta = _get_default_theta(kwargs.pop("theta", None))
+# theta = _get_default_theta(kwargs.pop("theta", None))
 
 # class attributes
 _nt
@@ -232,7 +232,7 @@ def _get_default_theta(theta):
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/_core/core.py#L1894
 
 # how function is called in get_D_fixed_spectrum()
-get_kT(inc, theta, veq, u)
+# get_kT(inc, theta, veq, u)
 
 # class attributes
 vsini_max
@@ -280,16 +280,16 @@ def get_kT(inc, theta, veq, u):
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L222
 
 # how function is called in solve_bilinear()
-process_inputs(flux, **kwargs)
+# process_inputs(flux, **kwargs)
 
 # class attributes
-Ny
-nt
-nw
-nc
-nw0 # maybe the shape of spectral_mean[n] arrays?
-S0e2i
-nw0_ # maybe a transformed version of nw0 for spectral covariance matrices?
+Ny = 256
+nt = 16
+nw = 70
+nc = 1
+nw0 = 300 # maybe the shape of spectral_mean[n] arrays?
+S0e2i = map._S0e2i.eval() # the evaluated symbolic expression
+nw0_ = 603 # maybe a transformed version of nw0 for spectral covariance matrices?
 
 # def process_inputs(spatial_cov, S0e2i, spectral_mean):
 def process_inputs(
@@ -329,22 +329,56 @@ def process_inputs(
     pass
 
 
+# -----------------------------------------
+# get log_wav0_int from DopplerMap.__init__
+wav = data["kwargs"]["wav"] # array (70,)
+nw = 70
+vsini_max = data["kwargs"]['vsini_max'] # 50000
+
+# Compute the padded internal wavelength grid (wav0_int).
+# We add bins corresponding to the maximum kernel width to each
+# end of wav_int to prevent edge effects
+
+_clight = 299792458.0  # m/s
+
+wav1 = np.min(wav)
+wav2 = np.max(wav)
+wavr = np.exp(0.5 * (np.log(wav1) + np.log(wav2)))
+log_wav = np.linspace(np.log(wav1 / wavr), np.log(wav2 / wavr), nw)
+
+dlam = log_wav[1] - log_wav[0]
+betasini_max = vsini_max / _clight
+hw = np.array(
+    np.ceil(
+        0.5
+        * np.abs(np.log((1 + betasini_max) / (1 - betasini_max)))
+        / dlam
+    ),
+    dtype="int32",
+)
+x = np.arange(0, hw + 1) * dlam
+pad_l = log_wav[0] - hw * dlam + x[:-1]
+pad_r = log_wav[-1] + x[1:]
+log_wav0_int = np.concatenate([pad_l, log_wav, pad_r])
+nwp = len(log_wav0_int)
+# -----------------------------------------
+
 # get_D_fixed_spectrum
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/_core/core.py#L1986
 
 # how function is called in design_matrix()
-D = get_D_fixed_spectrum(
-    _inc, theta, _veq, _u, _spectrum
-)
+# D = get_D_fixed_spectrum(
+#     _inc, theta, _veq, _u, _spectrum
+# )
 
 # class attributes
-nc
-nwp
-nt
-Ny
-nk
-nw
+nc = 1
+nwp = len(log_wav0_int) # 120 # from DopplerMap.__init__ (see directly above for code)
+nt = 16
+Ny = 256
+nk = int(2 * hw + 1) # 51 # hw also from DopplerMap.__init__
+nw = 70
 
 def get_D_fixed_spectrum(inc, theta, veq, u, spectrum):
     """
@@ -377,7 +411,7 @@ def get_D_fixed_spectrum(inc, theta, veq, u, spectrum):
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/_core/math.py#L218
 
 # how function is called in design_matrix()
-D = math.sparse_dot(_Si2eBlk, D)
+# D = math.sparse_dot(_Si2eBlk, D)
 
 def sparse_dot(A, B):
     """
@@ -405,17 +439,17 @@ def sparse_dot(A, B):
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler.py#L1170
 
 # how function is called in get_S()
-map.design_matrix(
-    theta=theta/_angle_factor, fix_spectrum=True
-)
+# map.design_matrix(
+#     theta=theta/_angle_factor, fix_spectrum=True
+# )
 
 # class attributes
-_inc
-_veq
-_u
-_spectrum
+_inc = data["kwargs"]["inc"] # 40
+_veq = data["kwargs"]["veq"] # 60000
+_u = map._u # = array([-1.  ,  0.5 ,  0.25])
+spectrum_ = map.spectrum_ # = map._spectrum # array (1,603)
 _interp = True
-_Si2eBlk
+_Si2eBlk = map._Si2eBlk # array (1120, 5616)
 
 def design_matrix(theta=None, fix_spectrum=None, fix_map=False):
     """
@@ -453,10 +487,9 @@ def design_matrix(theta=None, fix_spectrum=None, fix_map=False):
 # get_S: https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L124
 
 # class attributes
-spectrum_ # map._spectrum = self.spectrum_
-theta
-_angle_factor
-fix_spectrum
+theta = map._get_default_theta(data["kwargs"].pop("theta", None)) # array (16,)
+_angle_factor = np.pi/180 # converts between degrees and radians
+fix_spectrum = True
 
 def get_S():
     """
@@ -470,19 +503,20 @@ def get_S():
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L467
 
 # how function is called in solve_bilinear()
-solve_for_map_linear()
+# solve_for_map_linear()
 
 # class attributes
-spatial_mean
-spatial_inv_cov
-nc
-flux_err
-nt
-nw
-baseline
-flux
-S
-Ny
+Ny = 256
+spatial_mean = np.zeros(Ny)
+spatial_mean[0] = 1.0
+spatial_inv_cov # set in process_inputs()
+nc = 1
+flux_err = data["data"]["flux0_err"]
+nt = 16
+nw = 70
+baseline = None
+flux = data["data"]["flux0"]
+S = get_S()
 
 def solve_for_map_linear(T=1, baseline_var=0):
     """
@@ -512,15 +546,15 @@ def solve_for_map_linear(T=1, baseline_var=0):
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L177
 
 # how function is called in solve_bilinear()
-reset()
+# reset()
 
 # class attributes
-spectrum_
-y
-_S
-_C
-_KT0
-meta
+spectrum_ = None
+y = None
+_S = None
+_C = None
+_KT0 = None
+meta = {}
 
 def reset():
 
@@ -537,19 +571,17 @@ def reset():
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L737
 
 # how function is called in solve()
-solution = solve_bilinear(
-    flux, theta, y, spectrum_, veq, inc, u, **kwargs
-)
+# solution = solve_bilinear(
+#     flux, theta, _y, spectrum_, _veq, _inc, _u, **kwargs
+# )
 
 # class attributes
-fix_spectrum
-linear
-meta["y"]
-meta["cho_ycov"]
-meta["spectrum"]
-meta["cho_scov"]
+fix_spectrum = True
+normalized = False
+baseline = None
+linear = (not normalized) or (baseline is not None)
 
-def solve_bilinear(flux, theta, y, spectrum, veq, inc, u, **kwargs):
+def solve_bilinear(flux, theta, y, spectrum_, veq, inc, u, **kwargs):
     """
     Solve the linear problem for the spatial and/or spectral map
     given a spectral timeseries.
@@ -562,7 +594,7 @@ def solve_bilinear(flux, theta, y, spectrum, veq, inc, u, **kwargs):
     # Solve for the map conditioned on the spectrum
     solve_for_map_linear()
 
-    meta = True # {y, cho_ycov, spectrum, cho_scov}
+    meta = True # {y, cho_ycov, spectrum_, cho_scov}
 
     return meta
 
@@ -572,16 +604,16 @@ def solve_bilinear(flux, theta, y, spectrum, veq, inc, u, **kwargs):
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler.py#L1773
 
 # how function is called in paper
-soln = map.solve(
-    flux,
-    theta=theta,
-    normalized=False,
-    fix_spectrum=True,
-    flux_err=flux_err,
-)
+# soln = map.solve(
+#     flux,
+#     theta=theta,
+#     normalized=False,
+#     fix_spectrum=True,
+#     flux_err=flux_err,
+# )
 
 # class attributes
-_y = map.y # array (256,)
+_y = map._y # array (256,)
 spectrum_ = data["truths"]["spectrum"] # array (1,300)
 _veq = data["kwargs"]['veq'] # 60000
 _inc = data["kwargs"]['inc'] # 40
@@ -598,11 +630,11 @@ def solve(flux, solver="bilinear", **kwargs):
     # if bilinear
     # if solver.lower().startswith("bi"):
     solution = solve_bilinear(
-        flux, theta, y, spectrum, veq, inc, u, **kwargs
+        flux, theta, _y, spectrum_, _veq, _inc, _u, **kwargs
     )
     # else linear
     # solution = solve_nonlinear(
-    #     flux, theta, y, spectrum, veq, inc, u, **kwargs
+    #     flux, theta, _y, spectrum_, _veq, _inc, _u, **kwargs
     # )
 
     return solution

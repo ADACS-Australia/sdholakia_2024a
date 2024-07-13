@@ -92,17 +92,17 @@ baseline_var = 0
 nw = 70
 Ny = 256
 
-angle_factor = np.pi/180 # converts between degrees and radians
+_angle_factor = np.pi/180 # converts between degrees and radians
 
 interp = True
 
-Si2eBlk = map._Si2eBlk # array (1120, 5616)
+_Si2eBlk = map._Si2eBlk # array (1120, 5616)
 S0e2i = map._S0e2i # array (603, 300)
 
 u = map.u # array (3,) vector of limb darkening coefficients
 
 spectrum = spectrum_true  # array (1,300)
-
+spectrum_
 
 spatial_mean
 spatial_inv_cov # (array)
@@ -201,13 +201,13 @@ def map_solve(
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler.py#L1059
 
 # how function is called in solve()
-theta = get_default_theta(kwargs.pop("theta", None))
+theta = _get_default_theta(kwargs.pop("theta", None))
 
 # class attributes
 _nt
 _angle_factor
 
-def get_default_theta(theta):
+def _get_default_theta(theta):
 
     math.cast()
     ops.enforce_shape()
@@ -335,7 +335,7 @@ def process_inputs(
 
 # how function is called in design_matrix()
 D = get_D_fixed_spectrum(
-    inc, theta, veq, u, spectrum
+    _inc, theta, _veq, _u, _spectrum
 )
 
 # class attributes
@@ -377,7 +377,7 @@ def get_D_fixed_spectrum(inc, theta, veq, u, spectrum):
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/_core/math.py#L218
 
 # how function is called in design_matrix()
-D = math.sparse_dot(Si2eBlk, D)
+D = math.sparse_dot(_Si2eBlk, D)
 
 def sparse_dot(A, B):
     """
@@ -406,16 +406,16 @@ def sparse_dot(A, B):
 
 # how function is called in get_S()
 map.design_matrix(
-    theta=theta/angle_factor, fix_spectrum=True
+    theta=theta/_angle_factor, fix_spectrum=True
 )
 
 # class attributes
-inc
-veq
-u
-spectrum
-interp = True
-Si2eBlk
+_inc
+_veq
+_u
+_spectrum
+_interp = True
+_Si2eBlk
 
 def design_matrix(theta=None, fix_spectrum=None, fix_map=False):
     """
@@ -435,13 +435,13 @@ def design_matrix(theta=None, fix_spectrum=None, fix_map=False):
         havent read yet
     """
 
-    theta = get_default_theta(theta) # Tiger task
+    theta = _get_default_theta(theta) # Tiger task
 
     # if fix_spectrum:
-    D = get_D_fixed_spectrum(inc, theta, veq, u, spectrum)
+    D = get_D_fixed_spectrum(_inc, theta, _veq, _u, _spectrum)
 
-    # if interp:
-    D = sparse_dot(Si2eBlk, D)
+    # if _interp:
+    D = sparse_dot(_Si2eBlk, D)
 
     return D
 
@@ -453,15 +453,16 @@ def design_matrix(theta=None, fix_spectrum=None, fix_map=False):
 # get_S: https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L124
 
 # class attributes
+spectrum_ # map._spectrum = self.spectrum_
 theta
-angle_factor
+_angle_factor
 fix_spectrum
 
 def get_S():
     """
     Get design matrix conditioned on the current spectrum.
     """
-    return design_matrix(theta/angle_factor, fix_spectrum=True)
+    return design_matrix(theta/_angle_factor, fix_spectrum=True)
 
 
 # solve_for_map_linear
@@ -514,20 +515,20 @@ def solve_for_map_linear(T=1, baseline_var=0):
 reset()
 
 # class attributes
-spectrum
+spectrum_
 y
-S
-C
-KT0
+_S
+_C
+_KT0
 meta
 
 def reset():
 
-    spectrum = None
+    spectrum_ = None
     y = None
-    S = None
-    C = None
-    KT0 = None
+    _S = None
+    _C = None
+    _KT0 = None
     meta = {}
 
 
@@ -537,7 +538,7 @@ def reset():
 
 # how function is called in solve()
 solution = solve_bilinear(
-    flux, theta, y, spectrum, veq, inc, u, **kwargs
+    flux, theta, y, spectrum_, veq, inc, u, **kwargs
 )
 
 # class attributes
@@ -580,11 +581,11 @@ soln = map.solve(
 )
 
 # class attributes
-y = map.y # array (256,)
-spectrum = data["truths"]["spectrum"] # array (1,300)
-veq = data["kwargs"]['veq'] # 60000
-inc = data["kwargs"]['inc'] # 40
-u = data["props"]["u"] # the vector of limb darkening coefficients
+_y = map.y # array (256,)
+spectrum_ = data["truths"]["spectrum"] # array (1,300)
+_veq = data["kwargs"]['veq'] # 60000
+_inc = data["kwargs"]['inc'] # 40
+_u = data["props"]["u"] # the vector of limb darkening coefficients
 
 def solve(flux, solver="bilinear", **kwargs):
     """
@@ -592,7 +593,7 @@ def solve(flux, solver="bilinear", **kwargs):
     and/or spectral map given a spectral timeseries.
     """
 
-    theta = get_default_theta(kwargs.pop("theta", None))
+    theta = _get_default_theta(kwargs.pop("theta", None))
 
     # if bilinear
     # if solver.lower().startswith("bi"):

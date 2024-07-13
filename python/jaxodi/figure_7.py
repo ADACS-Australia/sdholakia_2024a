@@ -71,52 +71,66 @@ for n in range(map.udeg):
 # ---
 
 
-ydeg = data["kwargs"]['ydeg'] # 15
-udeg = data["kwargs"]['udeg'] # 2 (leaves out the 0th deg = -1)
-nc = data["kwargs"]['nc'] # 1
-veq = data["kwargs"]['veq'] # 60000
-inc = data["kwargs"]['inc'] # 40
-vsini_max = data["kwargs"]['vsini_max'] # 50000
-nt = data["kwargs"]['nt'] # 16
-wav = data["kwargs"]['wav'] # array (70,)
-
-baseline = map.baseline # array (16,)
-
-normalised = False
+# Class attributes used in map.solve() & dependencies (except Tiger's functions)
+_y = map._y # array (256,)
+spectrum_ = data["truths"]["spectrum"] # array (1,300)
+_veq = data["kwargs"]['veq'] # 60000
+_inc = data["kwargs"]['inc'] # 40
+_u = data["props"]["u"] # the vector of limb darkening coefficients
 fix_spectrum = True
-
-T = 1
-
-baseline_var = 0
-
+normalized = False
+baseline = None
+linear = (not normalized) or (baseline is not None)
+Ny = 256
+spatial_mean = np.zeros(Ny)
+spatial_mean[0] = 1.0
+spatial_inv_cov # array (256, 1) # set in process_inputs()
+nc = 1
+flux_err = data["data"]["flux0_err"]
+nt = 16
+nw = 70
+baseline = None
+flux = data["data"]["flux0"]
+S = get_S() # get_S() calls design_matrix()
+theta = map._get_default_theta(data["kwargs"].pop("theta", None)) # array (16,)
+_angle_factor = np.pi/180 # converts between degrees and radians
+fix_spectrum = True
+_inc = data["kwargs"]["inc"] # 40
+_veq = data["kwargs"]["veq"] # 60000
+_u = map._u # = array([-1.  ,  0.5 ,  0.25])
+_spectrum = map.spectrum_ # = map._spectrum # array (1,603)
+_interp = True
+_Si2eBlk = map._Si2eBlk # array (1120, 5616)
+nc = 1
+nwp = 120 # from DopplerMap.__init__
+nt = 16
+Ny = 256
+hw = 25
+nk = int(2 * hw + 1) # 51
 nw = 70
 Ny = 256
+nt = 16
+nw = 70
+nc = 1
+nw0 = 300 # maybe the shape of spectral_mean[n] arrays?
+S0e2i = map._S0e2i.eval() # the evaluated symbolic expression
+nw0_ = 603 # maybe a transformed version of nw0 for spectral covariance matrices?
 
-_angle_factor = np.pi/180 # converts between degrees and radians
 
-interp = True
 
-_Si2eBlk = map._Si2eBlk # array (1120, 5616)
-S0e2i = map._S0e2i # array (603, 300)
 
-u = map.u # array (3,) vector of limb darkening coefficients
 
-spectrum = spectrum_true  # array (1,300)
-spectrum_
 
-spatial_mean
-spatial_inv_cov # (array)
-n
-S
-cho_C
-mu
-invL
-meta["y_lin"]
-y = map.y # array (256,)
-cho_ycov
+
+
+
+
+
 
 
 # FUNCTIONS ----------------------------------------------------------------------------------------------------------------------
+
+
 
 # Functions from 2023B
 # --------------------
@@ -193,6 +207,9 @@ def map_solve(
 
 
 
+
+
+
 # Tiger's Functions
 # -----------------
 
@@ -204,7 +221,7 @@ def map_solve(
 # theta = _get_default_theta(kwargs.pop("theta", None))
 
 # class attributes
-_nt
+_nt # = nt?
 _angle_factor
 
 def _get_default_theta(theta):
@@ -235,13 +252,13 @@ def _get_default_theta(theta):
 # get_kT(inc, theta, veq, u)
 
 # class attributes
-vsini_max
+vsini_max = 50000
 F # not sure if function or attribute?
 A1Inv
 A1
-nt
-Ny
-nk
+nt = 16
+Ny = 256
+nk = 51
 
 def get_kT(inc, theta, veq, u):
     """
@@ -291,7 +308,6 @@ nw0 = 300 # maybe the shape of spectral_mean[n] arrays?
 S0e2i = map._S0e2i.eval() # the evaluated symbolic expression
 nw0_ = 603 # maybe a transformed version of nw0 for spectral covariance matrices?
 
-# def process_inputs(spatial_cov, S0e2i, spectral_mean):
 def process_inputs(
         flux,
         flux_err=None,
@@ -362,6 +378,7 @@ pad_r = log_wav[-1] + x[1:]
 log_wav0_int = np.concatenate([pad_l, log_wav, pad_r])
 nwp = len(log_wav0_int)
 # -----------------------------------------
+
 
 # get_D_fixed_spectrum
 #
@@ -447,7 +464,7 @@ def sparse_dot(A, B):
 _inc = data["kwargs"]["inc"] # 40
 _veq = data["kwargs"]["veq"] # 60000
 _u = map._u # = array([-1.  ,  0.5 ,  0.25])
-spectrum_ = map.spectrum_ # = map._spectrum # array (1,603)
+_spectrum = map.spectrum_ # = map._spectrum # array (1,603)
 _interp = True
 _Si2eBlk = map._Si2eBlk # array (1120, 5616)
 
@@ -480,7 +497,6 @@ def design_matrix(theta=None, fix_spectrum=None, fix_map=False):
     return D
 
 
-
 # get_S
 #
 # S: https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L201
@@ -498,6 +514,47 @@ def get_S():
     return design_matrix(theta/_angle_factor, fix_spectrum=True)
 
 
+# -----------------------------------------
+# code for spatial_inv_cov from process_inputs()
+nc = data["kwargs"]['nc'] # 1
+Ny = 256
+spatial_cov = None # as far as I can tell
+
+if spatial_cov is None:
+    spatial_cov = 1e-4
+
+if type(spatial_cov) not in (list, tuple):
+    # Use the same covariance for all components
+    spatial_cov = [spatial_cov for n in range(nc)]
+else:
+    # Check that we have one covariance per component
+    assert len(spatial_cov) == nc
+
+spatial_inv_cov = [None for n in range(nc)]
+ndim = np.array(spatial_cov[0]).ndim
+for n in range(nc):
+    spatial_cov[n] = np.array(spatial_cov[n])
+    assert spatial_cov[n].ndim == ndim
+    if spatial_cov[n].ndim < 2:
+        spatial_inv_cov[n] = np.reshape(
+            np.ones(Ny) / spatial_cov[n], (-1, 1)
+        )
+        spatial_cov[n] = np.reshape(
+            np.ones(Ny) * spatial_cov[n], (-1, 1)
+        )
+    # else:
+    #     cho = cho_factor(spatial_cov[n])
+    #     inv = cho_solve(cho, np.eye(Ny))
+    #     spatial_inv_cov[n] = np.reshape(inv, (Ny, Ny, 1))
+    #     spatial_cov[n] = np.reshape(
+    #         spatial_cov[n], (Ny, Ny, 1)
+    #     )
+
+# Tensor of nc (inverse) variance vectors or covariance matrices
+spatial_cov = np.concatenate(spatial_cov, axis=-1)
+spatial_inv_cov = np.concatenate(spatial_inv_cov, axis=-1)
+# -----------------------------------------
+
 # solve_for_map_linear
 #
 # https://github.com/rodluger/starry/blob/b72dff08588532f96bd072f2f1005e227d8e4ed8/starry/doppler_solve.py#L467
@@ -509,7 +566,7 @@ def get_S():
 Ny = 256
 spatial_mean = np.zeros(Ny)
 spatial_mean[0] = 1.0
-spatial_inv_cov # set in process_inputs()
+spatial_inv_cov # array (256, 1) # set in process_inputs() (relevant code directly above)
 nc = 1
 flux_err = data["data"]["flux0_err"]
 nt = 16
@@ -525,15 +582,18 @@ def solve_for_map_linear(T=1, baseline_var=0):
 
     # ~60 lines of code that don't use theano
 
-    block_diag()
-    # scipy.linalg.block_diag()
+    # block_diag() # == scipy.linalg.block_diag()
 
-    cho_factor()
-    # cho_factor == scipy.linalg.cholesky(*args, **kwargs, lower=True)
+    # cho_factor() # == scipy.linalg.cholesky(*args, **kwargs, lower=True)
     # == jax.scipy.linalg.cholesky(_input_, lower=True)
 
     # can get S via call
     S = get_S()
+
+    # set within function
+    cho_C = None
+    mu = None
+    invL = None
 
     #  mean, cho_ycov = greedy_linalg.solve(S, flux, cho_C, mu, invL)
     mean, cho_ycov = map_solve(S, flux, cho_C, mu, invL)
@@ -548,7 +608,7 @@ def solve_for_map_linear(T=1, baseline_var=0):
 # how function is called in solve_bilinear()
 # reset()
 
-# class attributes
+# class attributes (values are irrelevant)
 spectrum_ = None
 y = None
 _S = None
@@ -590,9 +650,8 @@ def solve_bilinear(flux, theta, y, spectrum_, veq, inc, u, **kwargs):
     reset()
     process_inputs(flux, **kwargs)
 
-    # if fix_spectrum and linear: # The problem is exactly linear!
-    # Solve for the map conditioned on the spectrum
-    solve_for_map_linear()
+    if fix_spectrum and linear: # The problem is exactly linear!
+        solve_for_map_linear() # Solve for the map conditioned on the spectrum
 
     meta = True # {y, cho_ycov, spectrum_, cho_scov}
 

@@ -72,11 +72,12 @@ for n in range(map.udeg):
 
 
 # Class attributes used in map.solve() & dependencies (except Tiger's functions)
+# in call order (i.e. map.solve() first)
 _y = map._y # array (256,)
 spectrum_ = data["truths"]["spectrum"] # array (1,300)
 _veq = data["kwargs"]['veq'] # 60000
 _inc = data["kwargs"]['inc'] # 40
-_u = data["props"]["u"] # the vector of limb darkening coefficients
+_u = map._u # = array([-1.  ,  0.5 ,  0.25]) # the vector of limb darkening coefficients
 fix_spectrum = True
 normalized = False
 baseline = None
@@ -676,7 +677,7 @@ _y = map._y # array (256,)
 spectrum_ = data["truths"]["spectrum"] # array (1,300)
 _veq = data["kwargs"]['veq'] # 60000
 _inc = data["kwargs"]['inc'] # 40
-_u = data["props"]["u"] # the vector of limb darkening coefficients
+_u = map._u # = array([-1., 0.5, 0.25]) # the vector of limb darkening coefficients
 
 def solve(flux, solver="bilinear", **kwargs):
     """

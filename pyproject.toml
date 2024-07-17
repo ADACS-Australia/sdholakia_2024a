@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "jax-dopplerimaging"
+name = "jaxodi"
 version = "0.0.0-dev"
 description = "Doppler Imaging in JAX"
 authors = []

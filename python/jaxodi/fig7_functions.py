@@ -71,11 +71,10 @@ def map_solve(
         CInvX = jnp.dot(jnp.diag(1 / cho_C**2), X)
     else:
         CInvX = cho_solve(cho_C, X)
-    print(f"CInvX: {CInvX}")
-    # breakpoint()
+
     # Compute W = X^T . C^-1 . X + L^-1
     W = jnp.dot(jnp.transpose(X), CInvX)
-    print(f"W: {W}")
+
     # If LInv is a scalar or a 1-dimensional array, increment the
     # diagonal elements of W with the values from LInv.
     if LInv.ndim == 0 or LInv.ndim == 1:
@@ -85,26 +84,13 @@ def map_solve(
     else:
         W += LInv
         LInvmu = jnp.dot(LInv, mu)
-    print(f"W: {W}")
-    # with open("solve_midpoint_W.npy", "rb") as f:
-    #     exp_W = np.load(f)
-    # print(f"exp_W: {cho_W}")
-    print(f"LInvmu: {LInvmu}")
 
     # Compute the max like y and its covariance matrix
     cho_W = jax.scipy.linalg.cholesky(W, lower=True)
-    # print(f"cho_W: {cho_W}")
-    # with open("solve_midpoint_cho_W.npy", "rb") as f:
-    #     exp_cho_W = np.load(f)
-    # print(f"exp_cho_W: {cho_W}")
     M = cho_solve(cho_W, jnp.transpose(CInvX))
-    # print(f"M: {M}")
     yhat = jnp.dot(M, flux) + cho_solve(cho_W, LInvmu)
-    # print(f"yhat: {yhat}")
     ycov = cho_solve(cho_W, jnp.eye(cho_W.shape[0]))
-    # print(f"ycov: {ycov}")
     cho_ycov = jax.scipy.linalg.cholesky(ycov, lower=True)
-    # print(f"cho_ycov: {cho_ycov}")
 
     return yhat, cho_ycov
 
@@ -422,13 +408,7 @@ def solve_for_map_linear(
         S = jnp.load(f)
     
     # Solve the L2 problem
-    # mean, cho_ycov = map_solve(S, flux, cho_C, mu, invL)  # TODO: map_solve()
-
-    # load from data instead of map_solve()
-    with open("map_solve_mean_output.npy", "rb") as f:
-        mean = jnp.load(f)
-    with open("map_solve_cho_ycov_output.npy", "rb") as f:
-        cho_ycov = jnp.load(f)
+    mean, cho_ycov = map_solve(S, flux, cho_C, mu, invL)
 
     y = jnp.transpose(jnp.reshape(mean, (nc, Ny)))
 
@@ -454,6 +434,7 @@ def solve_bilinear(
         nw0_: int,
         S0e2i: Array,
         flux_err: float,
+        normalized: bool,
         # pass to solve_for_map_linear()
         fix_spectrum: bool,
         baseline_var: int,
@@ -466,7 +447,7 @@ def solve_bilinear(
 
     processed_inputs = process_inputs(
         flux, nt, nw, nc, Ny, nw0, nw0_, S0e2i,
-        normalized=False, flux_err=flux_err,
+        normalized=normalized, flux_err=flux_err,
     )
 
     linear = processed_inputs["linear"]
@@ -475,8 +456,6 @@ def solve_bilinear(
     spatial_inv_cov = processed_inputs["spatial_inv_cov"]
     flux_err = processed_inputs["flux_err"]
     # T = processed_inputs["T"]
-
-    # print(f"------ linear: {linear}")     # TODO: Remove after debugging.
 
     if fix_spectrum:
         if linear:
@@ -499,6 +478,7 @@ def solve(
         nw0_: int,
         S0e2i: Array,
         flux_err: float,
+        normalized: bool,
         fix_spectrum: bool,
         baseline_var: int,
         S: Array,
@@ -518,7 +498,7 @@ def solve(
 
     if solver.lower().startswith("bi"):
         y, cho_ycov = solve_bilinear(
-            flux, nt, nw, nc, Ny, nw0, nw0_, S0e2i, flux_err,                   # pass to process_inputs()
+            flux, nt, nw, nc, Ny, nw0, nw0_, S0e2i, flux_err, normalized,       # pass to process_inputs()
             fix_spectrum, baseline_var, S,                                      # pass to solve_for_map_linear()
             # theta, _angle_factor, y, spectrum_, veq, inc, u, normalized,      # not being passed in yet - all for S?
         )

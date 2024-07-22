@@ -1,28 +1,15 @@
 """
 Tests for Figure 7's map.solve() and dependencies.
 
-19/7 Update
------------
-
-test_get_default_theta      |                   pass by call    |
-test_process_inputs         |   pass by data                    |
-test_map_solve              |                   fail by call    |
-test_solve_for_map_linear   |   pass by data    fail by call    |
-test_solve_bilinear         |   pass by data                    |
-test_solve                  |                   pass by call    |
-
-
 TODO:
 
     - load saved data in data()
-    - create separate tests for data loads and function calls
-
 
 """
 
 import pytest
 
-# import jax
+import jax
 import jax.numpy as jnp
 import numpy as np
 import scipy
@@ -47,6 +34,7 @@ from jaxodi.fig7_functions import (
     solve
 )
 
+jax.config.update("jax_enable_x64", True)
 
 # TODO: load saved data.
 @pytest.fixture(autouse=True)
@@ -141,9 +129,14 @@ def data():
     return (map, theta, _angle_factor, flux, flux_err, wav, wav0, S)
 
 
-# 19/7 -> load data     -> 
-#      -> call starry   -> pass
-def test_get_default_theta(data):
+# 19/7 -> 
+def test_get_default_theta_against_data(data):
+
+    pass
+
+
+# 22/7 -> pass
+def test_get_default_theta_compare_stary(data):
 
     # Load the inputs.
     map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
@@ -151,16 +144,21 @@ def test_get_default_theta(data):
     # Get calculated outputs.
     calc_theta = get_default_theta(theta, _angle_factor)
     
-    # NOTE: To get expected outputs, can either call starry function OR load saved data.
     # Get expected outputs.
     exp_theta = map._get_default_theta(theta)
+
     # Compare calculated and expected results.
     assert_allclose(calc_theta, exp_theta)
 
 
-# 19/7 -> load data     -> pass
-#      -> call starry   -> 
-def test_process_inputs(data):
+# 22/7 -> 
+def test_process_inputs_against_data(data):
+
+    pass
+
+
+# 22/7 -> pass
+def test_process_inputs_compare_starry(data):
 
     # Load the inputs.
     map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
@@ -177,10 +175,6 @@ def test_process_inputs(data):
         flux, normalized=False, flux_err=flux_err,
     )
 
-    # TODO: What is this for? Do I still need it?
-    # print(f"test_process_inputs::exp_linear: {map._solver.linear}")
-    # print(f"test_process_inputs::calc_linear: {calc_processed['linear']}")
-
     # Compare calculated and expected results.
     assert_allclose(map._solver.flux, calc_processed['flux'])
     assert_allclose(map._solver.flux_err, calc_processed['flux_err'])
@@ -194,16 +188,15 @@ def test_process_inputs(data):
     assert_allclose(map._solver.linear, calc_processed['linear'])
 
 
-# TODO: write test
+# TODO: how to get inputs/outputs to compare against?
 def test_cho_solve(data):
 
     # cho_solve()
     pass
 
 
-# 19/7 -> load data     -> 
-#      -> call starry   -> fail
-def test_map_solve(data):
+# 22/7 -> pass
+def test_map_solve_against_data(data):
 
     # Load the inputs.
     map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
@@ -228,26 +221,53 @@ def test_map_solve(data):
     # Get calculated outputs.
     calc_mean, calc_cho_ycov = map_solve(S, flux, cho_C, mu, invL)
 
-    # NOTE: To get expected outputs, can either call starry function OR load saved data.
-
-    # Get expected outputs.
-    exp_mean, exp_cho_ycov = greedy_linalg.solve(S, flux, cho_C, mu, invL)
-
-    # TODO: Try loading data. Not sure if this code is correct?
-    # # Load saved expected outputs.
-    # with open("map_solve_mean_output.npy", "rb") as f:
-    #     exp_mean = np.load(f)
-    # with open("map_solve_cho_ycov_output.npy", "rb") as f:
-    #     exp_cho_ycov = np.load(f)
+    # Load saved expected outputs.
+    with open("map_solve_mean_output.npy", "rb") as f:
+        exp_mean = np.load(f)
+    with open("map_solve_cho_ycov_output.npy", "rb") as f:
+        exp_cho_ycov = np.load(f)
 
     # Compare calculated and expected results.
     assert_allclose(calc_mean, exp_mean)
     assert_allclose(calc_cho_ycov, exp_cho_ycov)
 
 
-# 19/7 -> load data     -> pass
-#      -> call starry   -> fail
-def test_solve_for_map_linear(data):
+# 22/7 -> pass
+def test_map_solve_compare_starry(data):
+
+    # Load the inputs.
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
+    with open("map_solve_S_input.npy", "rb") as f:
+        S = np.load(f)
+    with open("map_solve_flux_input.npy", "rb") as f:
+        flux = np.load(f)
+    with open("map_solve_cho_C_input.npy", "rb") as f:
+        cho_C = np.load(f)
+    with open("map_solve_mu_input.npy", "rb") as f:
+        mu = np.load(f)
+    with open("map_solve_invL_input.npy", "rb") as f:
+        invL = np.load(f)
+    
+    # Convert them to jax arrays?
+    S = jnp.array(S)
+    flux = jnp.array(flux)
+    cho_C = jnp.array(cho_C)
+    mu = jnp.array(mu)
+    invL = jnp.array(invL)
+
+    # Get calculated outputs.
+    calc_mean, calc_cho_ycov = map_solve(S, flux, cho_C, mu, invL)
+
+    # Get expected outputs.
+    exp_mean, exp_cho_ycov = greedy_linalg.solve(S, flux, cho_C, mu, invL)
+
+    # Compare calculated and expected results.
+    assert_allclose(calc_mean, exp_mean)
+    assert_allclose(calc_cho_ycov, exp_cho_ycov)
+
+
+# 22/7 -> pass
+def test_solve_for_map_linear_against_data(data):
 
     # Load the inputs.
     map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
@@ -270,14 +290,6 @@ def test_solve_for_map_linear(data):
         spatial_mean, spatial_inv_cov, flux_err, map.nt, map.nw, baseline_var, T, flux, S, map.nc, map.Ny,
     )
 
-    # NOTE: To get expected outputs, can either call starry function OR load saved data.
-
-    # TODO: Fix spectrum is None error.
-    # Get expected outputs.
-    # map._solver.theta = theta * _angle_factor
-    # map._solver.process_inputs(flux)
-    # exp_y, exp_cho_ycov = map._solver.solve_for_map_linear() # --> ERROR: self.spectrum is None when design_matrix() is called
-
     # Load saved expected outputs.
     with open("map_solve_mean_output.npy", "rb") as f:
         exp_mean = np.load(f)
@@ -290,26 +302,60 @@ def test_solve_for_map_linear(data):
     assert_allclose(calc_cho_ycov, exp_cho_ycov)
 
 
-# 19/7 -> load data     -> pass
-#      -> call starry   -> ?
-def test_solve_bilinear(data):
+# 22/7 -> pass
+def test_solve_for_map_linear_compare_starry(data):
+
+    # Load the inputs.
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
+    T = 1
+    baseline_var = 0
+    S = "dummy"
+
+    # Process the inputs.
+    processed_inputs = process_inputs(
+        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i,
+        normalized=False, flux_err=flux_err,
+    )
+    flux = processed_inputs["flux"] # doesn't change in this case
+    spatial_mean = processed_inputs["spatial_mean"]
+    spatial_inv_cov = processed_inputs["spatial_inv_cov"]
+    flux_err = processed_inputs["flux_err"]
+
+    # Get calculated outputs.
+    calc_y, calc_cho_ycov = solve_for_map_linear(
+        spatial_mean, spatial_inv_cov, flux_err, map.nt, map.nw, baseline_var, T, flux, S, map.nc, map.Ny,
+    )
+
+    # TODO: Fix spectrum is None error.
+    # Get expected outputs.
+    map._solver.theta = theta * _angle_factor
+    map._solver.process_inputs(flux, normalized=False, fix_spectrum=True, flux_err=flux_err)
+    map._solver.spectrum_ = map.spectrum_
+    map._solver.solve_for_map_linear() # --> ERROR: self.spectrum is None when design_matrix() is called
+
+    exp_y = map._solver.y
+    exp_cho_ycov = map._solver.cho_ycov
+
+    # Compare calculated and expected results.
+    assert_allclose(calc_y, exp_y)
+    assert_allclose(calc_cho_ycov, exp_cho_ycov)
+
+
+# 22/7 -> pass
+def test_solve_bilinear_against_data(data):
 
     # Process the inputs.
     map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
     fix_spectrum = True
+    normalized = False
     baseline_var = 0
 
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve_bilinear(
-        flux, map._nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, flux_err,
+        flux, map._nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, flux_err, normalized,
         fix_spectrum, baseline_var, S,
     )
 
-    # NOTE: To get expected outputs, can either call starry function OR load saved data.
-    # Get expected outputs.
-    # soln = map._solver.solve_bilinear(
-    #             flux, theta, map.y, map.spectrum_, map._veq, map._inc, map._u, **kwargs   # TODO: fix inputs
-    #         )
     # Load saved expected outputs.
     with open("map_solve_mean_output.npy", "rb") as f:
         exp_mean = np.load(f)
@@ -322,18 +368,56 @@ def test_solve_bilinear(data):
     assert_allclose(calc_cho_ycov, exp_cho_ycov)
 
 
-# 19/7 -> load data     -> 
-#      -> call starry   -> pass
-def test_solve(data):
+# 22/7 -> pass
+def test_solve_bilinear_compare_starry(data):
 
     # Process the inputs.
     map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
     fix_spectrum = True
+    normalized = False
+    baseline_var = 0
+
+    theta = theta * _angle_factor
+
+    # Get calculated outputs.
+    calc_y, calc_cho_ycov = solve_bilinear(
+        flux, map._nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, flux_err, normalized,
+        fix_spectrum, baseline_var, S,
+    )
+
+    # Get expected outputs.
+    metadata = map._solver.solve_bilinear(
+                flux, theta, map.y, map.spectrum_, map._veq, map._inc, map._u,
+                fix_spectrum=True,
+                flux_err=flux_err,
+                normalized=False,
+            )
+    
+    exp_y = metadata["y"]
+    exp_cho_ycov = metadata["cho_ycov"]
+
+    # Compare calculated and expected results.
+    assert_allclose(calc_y, exp_y)
+    assert_allclose(calc_cho_ycov, exp_cho_ycov)
+
+
+def test_solve_against_data(data):
+
+    pass
+
+
+# 22/7 -> pass
+def test_solve_compare_starry(data):
+
+    # Process the inputs.
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
+    fix_spectrum = True
+    normalized = False
     baseline_var = 0
 
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve(
-        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, flux_err,
+        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, flux_err, normalized,
         fix_spectrum, baseline_var, S,
         theta, _angle_factor,
     )

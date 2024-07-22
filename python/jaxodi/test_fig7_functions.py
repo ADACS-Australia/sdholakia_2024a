@@ -27,7 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 import scipy
 
-# from jaxoplanet.types import Array
+from jaxoplanet.types import Array
 from jaxoplanet.test_utils import assert_allclose
 
 # To generate variables ---

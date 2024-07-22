@@ -86,11 +86,17 @@ def map_solve(
         W += LInv
         LInvmu = jnp.dot(LInv, mu)
     print(f"W: {W}")
+    # with open("solve_midpoint_W.npy", "rb") as f:
+    #     exp_W = np.load(f)
+    # print(f"exp_W: {cho_W}")
     print(f"LInvmu: {LInvmu}")
 
     # Compute the max like y and its covariance matrix
     cho_W = jax.scipy.linalg.cholesky(W, lower=True)
-    print(f"cho_W: {cho_W}")
+    # print(f"cho_W: {cho_W}")
+    # with open("solve_midpoint_cho_W.npy", "rb") as f:
+    #     exp_cho_W = np.load(f)
+    # print(f"exp_cho_W: {cho_W}")
     M = cho_solve(cho_W, jnp.transpose(CInvX))
     # print(f"M: {M}")
     yhat = jnp.dot(M, flux) + cho_solve(cho_W, LInvmu)
@@ -104,16 +110,16 @@ def map_solve(
 
 
 def process_inputs(
-        flux,
-        nt,
-        nw,
-        nc,
-        Ny,
-        nw0,
-        nw0_,
-        S0e2i,
-        flux_err=None,
-        normalized=True,
+        flux: Array,
+        nt: int,
+        nw: int,
+        nc: int,
+        Ny: int,
+        nw0: int,
+        nw0_: int,
+        S0e2i: Array,
+        flux_err: float=None,
+        normalized: bool=True,
         baseline=None,
         spatial_mean=None,
         spatial_cov=None,
@@ -128,8 +134,8 @@ def process_inputs(
     if flux_err is None:
         flux_err = 1e-4
     if spatial_mean is None:
-        spatial_mean = np.zeros(Ny)
-        spatial_mean[0] = 1.0
+        spatial_mean = jnp.zeros(Ny)
+        spatial_mean = spatial_mean.at[0].set(1.0)
     if spatial_cov is None:
         spatial_cov = 1e-4
     if spectral_mean is None:
@@ -148,12 +154,12 @@ def process_inputs(
     # Flux must be a matrix (nt, nw)
     # if nt == 1:
     # else:
-    assert np.array_equal(
-        np.shape(flux), np.array([nt, nw])
+    assert jnp.array_equal(
+        jnp.shape(flux), jnp.array([nt, nw])
     ), "Invalid shape for `flux`."
 
     # Flux error may be a scalar, a vector, or a matrix (nt, nw)
-    flux_err = np.array(flux_err)
+    flux_err = jnp.array(flux_err)
     # if flux_err.ndim == 0:
     #     flux_err = flux_err
     # else:
@@ -165,12 +171,12 @@ def process_inputs(
         spatial_mean = [spatial_mean for n in range(nc)]
     # else:
     for n in range(nc):
-        spatial_mean[n] = np.array(spatial_mean[n])
+        spatial_mean[n] = jnp.array(spatial_mean[n])
         assert spatial_mean[n].ndim < 2
-        spatial_mean[n] = np.reshape(
-            spatial_mean[n] * np.ones(Ny), (-1, 1)
+        spatial_mean[n] = jnp.reshape(
+            spatial_mean[n] * jnp.ones(Ny), (-1, 1)
         )
-    spatial_mean = np.concatenate(spatial_mean, axis=-1)
+    spatial_mean = jnp.concatenate(spatial_mean, axis=-1)
 
     # Spatial cov may be a scalar, a vector, a matrix (Ny, Ny),
     # or a list of those. Invert it and reshape to a matrix of
@@ -181,22 +187,22 @@ def process_inputs(
         spatial_cov = [spatial_cov for n in range(nc)]
     # else:
     spatial_inv_cov = [None for n in range(nc)]
-    ndim = np.array(spatial_cov[0]).ndim
+    ndim = jnp.array(spatial_cov[0]).ndim
     for n in range(nc):
-        spatial_cov[n] = np.array(spatial_cov[n])
+        spatial_cov[n] = jnp.array(spatial_cov[n])
         assert spatial_cov[n].ndim == ndim
         if spatial_cov[n].ndim < 2:
-            spatial_inv_cov[n] = np.reshape(
-                np.ones(Ny) / spatial_cov[n], (-1, 1)
+            spatial_inv_cov[n] = jnp.reshape(
+                jnp.ones(Ny) / spatial_cov[n], (-1, 1)
             )
-            spatial_cov[n] = np.reshape(
-                np.ones(Ny) * spatial_cov[n], (-1, 1)
+            spatial_cov[n] = jnp.reshape(
+                jnp.ones(Ny) * spatial_cov[n], (-1, 1)
             )
         # else:
     
     # Tensor of nc (inverse) variance vectors or covariance matrices
-    spatial_cov = np.concatenate(spatial_cov, axis=-1)
-    spatial_inv_cov = np.concatenate(spatial_inv_cov, axis=-1)
+    spatial_cov = jnp.concatenate(spatial_cov, axis=-1)
+    spatial_inv_cov = jnp.concatenate(spatial_inv_cov, axis=-1)
 
     # Baseline must be a vector (nt,)
     # if baseline is not None:
@@ -209,13 +215,13 @@ def process_inputs(
         spectral_mean = [spectral_mean for n in range(nc)]
     # else:
     for n in range(nc):
-        spectral_mean[n] = np.array(spectral_mean[n])
+        spectral_mean[n] = jnp.array(spectral_mean[n])
         assert spectral_mean[n].ndim < 2
-        spectral_mean[n] = np.reshape(
-            spectral_mean[n] * np.ones(nw0), (-1, 1)
+        spectral_mean[n] = jnp.reshape(
+            spectral_mean[n] * jnp.ones(nw0), (-1, 1)
         )
         spectral_mean[n] = S0e2i.dot(spectral_mean[n]).T
-    spectral_mean = np.concatenate(spectral_mean, axis=0)
+    spectral_mean = jnp.concatenate(spectral_mean, axis=0)
 
     # Spectral cov may be a scalar, a vector, a matrix (nw0, nw0),
     # or a list of those. Interpolate it to the internal grid,
@@ -227,23 +233,23 @@ def process_inputs(
         spectral_cov = [spectral_cov for n in range(nc)]
     # else:
     spectral_inv_cov = [None for n in range(nc)]
-    ndim = np.array(spectral_cov[0]).ndim
+    ndim = jnp.array(spectral_cov[0]).ndim
     for n in range(nc):
-        spectral_cov[n] = np.array(spectral_cov[n])
+        spectral_cov[n] = jnp.array(spectral_cov[n])
         assert spectral_cov[n].ndim == ndim
         if spectral_cov[n].ndim < 2:
             if spectral_cov[n].ndim == 0:
-                cov = np.ones(nw0_) * spectral_cov[n]
+                cov = jnp.ones(nw0_) * spectral_cov[n]
             else:
                 cov = S0e2i.dot(spectral_cov[n])
             inv = 1.0 / cov
-            spectral_inv_cov[n] = np.reshape(inv, (1, -1))
-            spectral_cov[n] = np.reshape(cov, (1, -1))
+            spectral_inv_cov[n] = jnp.reshape(inv, (1, -1))
+            spectral_cov[n] = jnp.reshape(cov, (1, -1))
         # else:
 
     # Tensor of nc (inverse) variance vectors or covariance matrices
-    spectral_cov = np.concatenate(spectral_cov, axis=0)
-    spectral_inv_cov = np.concatenate(spectral_inv_cov, axis=0)
+    spectral_cov = jnp.concatenate(spectral_cov, axis=0)
+    spectral_inv_cov = jnp.concatenate(spectral_inv_cov, axis=0)
 
     # Spectral guess must be a scalar, a vector (nw0), or a list of those
     # Interpolate it to the internal grid (nw0_) and reshape to (nc, nw0_)
@@ -252,11 +258,11 @@ def process_inputs(
 
     # Tempering schedule
     if nlogT == 1:
-        T = np.array([10 ** logTf])
+        T = jnp.array([10 ** logTf])
     elif logT0 == logTf:
-        T = logTf * np.ones(nlogT)
+        T = logTf * jnp.ones(nlogT)
     else:
-        T = np.logspace(logT0, logTf, nlogT)
+        T = jnp.logspace(logT0, logTf, nlogT)
 
     # Are we lucky enough to do a purely linear solve for the map?
     linear = (not normalized) or (baseline is not None)
@@ -377,58 +383,84 @@ def _get_S(theta, _angle_factor, fix_spectrum, spectrum_):
 
 
 def solve_for_map_linear(
-        spatial_mean, spatial_inv_cov, flux_err, nt, nw, baseline_var, T, flux, S, nc, Ny,
-    ):
+        spatial_mean: Array,
+        spatial_inv_cov: Array,
+        flux_err: float,
+        nt: int,
+        nw: int,
+        baseline_var: int,
+        T,
+        flux: Array,
+        S: Array,
+        nc: int,
+        Ny: int,
+    ) -> tuple[Array, Array]:
     """
     Solve for `y` linearly, given a baseline or unnormalized data.
     """
     # Reshape the priors
-    mu = np.reshape(np.transpose(spatial_mean), (-1))
+    mu = jnp.reshape(jnp.transpose(spatial_mean), (-1))
     if spatial_inv_cov.ndim == 2:
-        invL = np.reshape(np.transpose(spatial_inv_cov), (-1))
+        invL = jnp.reshape(jnp.transpose(spatial_inv_cov), (-1))
 
     # Ensure the flux error is a vector
     if flux_err.ndim == 0:
-        flux_err = flux_err * np.ones((nt, nw))
+        flux_err = flux_err * jnp.ones((nt, nw))
 
     # Factorised data covariance
     if baseline_var == 0:
-        cho_C = np.reshape(np.sqrt(T) * flux_err, (-1,))
+        cho_C = jnp.reshape(jnp.sqrt(T) * flux_err, (-1,))
 
     # Unroll the data into a vector
-    flux = np.reshape(flux, (-1,))
+    flux = jnp.reshape(flux, (-1,))
 
     # Get S
     # S = _get_S()                                          # TODO: _get_S()
 
     # load from data instead of _get_S()
     with open("map_solve_S_input.npy", "rb") as f:
-        S = np.load(f)
+        S = jnp.load(f)
     
     # Solve the L2 problem
     # mean, cho_ycov = map_solve(S, flux, cho_C, mu, invL)  # TODO: map_solve()
 
     # load from data instead of map_solve()
     with open("map_solve_mean_output.npy", "rb") as f:
-        mean = np.load(f)
+        mean = jnp.load(f)
     with open("map_solve_cho_ycov_output.npy", "rb") as f:
-        cho_ycov = np.load(f)
+        cho_ycov = jnp.load(f)
 
-    y = np.transpose(np.reshape(mean, (nc, Ny)))
+    y = jnp.transpose(jnp.reshape(mean, (nc, Ny)))
 
     return y, cho_ycov
 
 
-def get_default_theta(theta, _angle_factor):
+def get_default_theta(
+        theta: Array,
+        _angle_factor: float,
+    ) -> Array:
 
     return theta * _angle_factor
 
 
 def solve_bilinear(
-        flux, nt, nw, nc, Ny, nw0, nw0_, S0e2i, flux_err,               # pass to process_inputs()
-        fix_spectrum, baseline_var, S,                                  # pass to solve_for_map_linear()
-        # theta, _angle_factor, y, spectrum_, veq, inc, u, normalized,  # not being passed in yet - all for S?
-    ):
+        # pass to process_inputs()
+        flux: Array,
+        nt: int,
+        nw: int,
+        nc: int,
+        Ny: int,
+        nw0: int,
+        nw0_: int,
+        S0e2i: Array,
+        flux_err: float,
+        # pass to solve_for_map_linear()
+        fix_spectrum: bool,
+        baseline_var: int,
+        S: Array,
+        # not being passed in yet - all for S?
+        # theta, _angle_factor, y, spectrum_, veq, inc, u, normalized,
+    ) -> tuple[Array, Array]:
 
     # reset() - if have a class with self attributes.
 
@@ -448,21 +480,34 @@ def solve_bilinear(
 
     if fix_spectrum:
         if linear:
-            solution = solve_for_map_linear(
+            y, cho_ycov = solve_for_map_linear(
                 spatial_mean, spatial_inv_cov, flux_err, nt, nw, baseline_var, 1, flux, S, nc, Ny,
             )
     #     else:
     # else:
     
-    return solution
+    return y, cho_ycov
 
 
 def solve(
-        flux, nt, nw, nc, Ny, nw0, nw0_, S0e2i, flux_err, fix_spectrum, baseline_var, S,
-        theta, _angle_factor,
-        solver="bilinear",
-        # y, spectrum_, veq, inc, u, normalized,      # not being passed in yet - all for S?
-    ):
+        flux: Array,
+        nt: int,
+        nw: int,
+        nc: int,
+        Ny: int,
+        nw0: int,
+        nw0_: int,
+        S0e2i: Array,
+        flux_err: float,
+        fix_spectrum: bool,
+        baseline_var: int,
+        S: Array,
+        theta: Array,
+        _angle_factor: float,
+        solver: str="bilinear",
+        # not being passed in yet - all for S?
+        # y, spectrum_, veq, inc, u, normalized,
+    ) -> tuple[Array, Array]:
     """
     Iteratively solves the bilinear or nonlinear problem for the spatial
     and/or spectral map given a spectral timeseries.
@@ -472,11 +517,11 @@ def solve(
     theta = get_default_theta(theta, _angle_factor)
 
     if solver.lower().startswith("bi"):
-        solution = solve_bilinear(
+        y, cho_ycov = solve_bilinear(
             flux, nt, nw, nc, Ny, nw0, nw0_, S0e2i, flux_err,                   # pass to process_inputs()
             fix_spectrum, baseline_var, S,                                      # pass to solve_for_map_linear()
             # theta, _angle_factor, y, spectrum_, veq, inc, u, normalized,      # not being passed in yet - all for S?
         )
     # else:
     
-    return solution
+    return y, cho_ycov

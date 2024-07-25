@@ -1,10 +1,5 @@
 """
 Tests for Figure 7's map.solve() and dependencies.
-
-TODO:
-
-    - load saved data in data()
-
 """
 
 import pytest
@@ -36,9 +31,37 @@ from jaxodi.fig7_functions import (
 
 jax.config.update("jax_enable_x64", True)
 
-# TODO: load saved data.
+
 @pytest.fixture(autouse=True)
-def data():
+def saved_input_data():
+
+    with open("map_solve_S_input.npy", "rb") as f:
+        S = jnp.load(f)
+    with open("map_solve_flux_input.npy", "rb") as f:
+        flux = jnp.load(f)
+    with open("map_solve_cho_C_input.npy", "rb") as f:
+        cho_C = jnp.load(f)
+    with open("map_solve_mu_input.npy", "rb") as f:
+        mu = jnp.load(f)
+    with open("map_solve_invL_input.npy", "rb") as f:
+        invL = jnp.load(f)
+
+    return (S, flux, cho_C, mu, invL)
+
+
+@pytest.fixture(autouse=True)
+def saved_output_data():
+
+    with open("map_solve_mean_output.npy", "rb") as f:
+        exp_mean = np.load(f)
+    with open("map_solve_cho_ycov_output.npy", "rb") as f:
+        exp_cho_ycov = np.load(f)
+    
+    return (exp_mean, exp_cho_ycov)
+
+
+@pytest.fixture(autouse=True)
+def generated_data():
 
     data = generate_data()
 
@@ -75,43 +98,48 @@ def data():
 
     # Ny = 256
     # Nu = 3
-    N = 324
+    # N = 324
     nw = 70
     # nw0 = 300
     # nw0_ = 603
 
     _angle_factor = np.pi / 180
 
+    fix_spectrum = True
+    normalized = False
+    baseline_var = 0
+    _S0e2i = jnp.array(map._S0e2i.toarray())
+
     # ------------------------
     # Much code for setting S.
     nw = 351
     vsini_max = 50000
-    nt = 16
     wav1 = np.min(wav)
     wav2 = np.max(wav)
     wavr = np.exp(0.5 * (np.log(wav1) + np.log(wav2)))
-    log_wav = np.linspace(np.log(wav1 / wavr), np.log(wav2 / wavr), nw)
+    log_wav = jnp.linspace(np.log(wav1 / wavr), jnp.log(wav2 / wavr), nw)
     wav_int = wavr * np.exp(log_wav)
     interp_tol = 1e-12
     _clight = 299792458.0  # m/s
     dlam = log_wav[1] - log_wav[0]
     betasini_max = vsini_max / _clight
-    hw = np.array(
+    hw = jnp.array(
         np.ceil(
             0.5
-            * np.abs(np.log((1 + betasini_max) / (1 - betasini_max)))
+            * jnp.abs(jnp.log((1 + betasini_max) / (1 - betasini_max)))
             / dlam
         ),
         dtype="int32",
     )
-    x = np.arange(0, hw + 1) * dlam
+    x = jnp.arange(0, hw + 1) * dlam
     pad_l = log_wav[0] - hw * dlam + x[:-1]
     pad_r = log_wav[-1] + x[1:]
-    log_wav0_int = np.concatenate([pad_l, log_wav, pad_r])
-    wav0_int = wavr * np.exp(log_wav0_int)
-    nwp = len(log_wav0_int)
-    wav0 = np.array(wav0)
-    nw0 = len(wav0)
+    log_wav0_int = jnp.concatenate([pad_l, log_wav, pad_r])
+    wav0_int = wavr * jnp.exp(log_wav0_int)
+    wav0 = jnp.array(wav0)
+    # nw0 = len(wav0)
+    # nwp = len(log_wav0_int)
+
     S = map._get_spline_operator(wav_int, wav)
     S[np.abs(S) < interp_tol] = 0
     S = scipy.sparse.csr_matrix(S)
@@ -124,22 +152,24 @@ def data():
     S = map._get_spline_operator(wav0, wav0_int)
     S[np.abs(S) < interp_tol] = 0
     S = scipy.sparse.csr_matrix(S)
+
+    S = jnp.array(S.toarray())
     # ----------------------------
-    
-    return (map, theta, _angle_factor, flux, flux_err, wav, wav0, S)
+
+    return (map, theta, _angle_factor, flux, flux_err, wav, wav0, fix_spectrum, normalized, baseline_var, S, _S0e2i)
 
 
 # 19/7 -> 
-def test_get_default_theta_against_data(data):
+def test_get_default_theta_against_data():
 
     pass
 
 
 # 22/7 -> pass
-def test_get_default_theta_compare_stary(data):
+def test_get_default_theta_compare_stary(generated_data):
 
     # Load the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, fix_spectrum, normalized, baseline_var, S, _S0e2i = generated_data
 
     # Get calculated outputs.
     calc_theta = get_default_theta(theta, _angle_factor)
@@ -152,23 +182,22 @@ def test_get_default_theta_compare_stary(data):
 
 
 # 22/7 -> 
-def test_process_inputs_against_data(data):
+def test_process_inputs_against_data():
 
     pass
 
 
 # 22/7 -> pass
-def test_process_inputs_compare_starry(data):
+def test_process_inputs_compare_starry(generated_data):
 
     # Load the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, fix_spectrum, normalized, baseline_var, S, _S0e2i = generated_data
 
     # Get calculated outputs.
     calc_processed = process_inputs(
-        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, normalized=False, flux_err=flux_err,
+        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, _S0e2i, normalized=False, flux_err=flux_err,
     )
 
-    # NOTE: To get expected outputs, can either call starry function OR load saved data.
     # Get expected outputs.
     map._solver.reset()
     map._solver.process_inputs(
@@ -189,43 +218,23 @@ def test_process_inputs_compare_starry(data):
 
 
 # TODO: how to get inputs/outputs to compare against?
-def test_cho_solve(data):
+def test_cho_solve():
 
     # cho_solve()
     pass
 
 
 # 22/7 -> pass
-def test_map_solve_against_data(data):
+def test_map_solve_against_data(saved_input_data, saved_output_data):
 
     # Load the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
-    with open("map_solve_S_input.npy", "rb") as f:
-        S = np.load(f)
-    with open("map_solve_flux_input.npy", "rb") as f:
-        flux = np.load(f)
-    with open("map_solve_cho_C_input.npy", "rb") as f:
-        cho_C = np.load(f)
-    with open("map_solve_mu_input.npy", "rb") as f:
-        mu = np.load(f)
-    with open("map_solve_invL_input.npy", "rb") as f:
-        invL = np.load(f)
-    
-    # Convert them to jax arrays?
-    S = jnp.array(S)
-    flux = jnp.array(flux)
-    cho_C = jnp.array(cho_C)
-    mu = jnp.array(mu)
-    invL = jnp.array(invL)
+    S, flux, cho_C, mu, invL = saved_input_data
+
+    # Load saved expected outputs.
+    exp_mean, exp_cho_ycov = saved_output_data
 
     # Get calculated outputs.
     calc_mean, calc_cho_ycov = map_solve(S, flux, cho_C, mu, invL)
-
-    # Load saved expected outputs.
-    with open("map_solve_mean_output.npy", "rb") as f:
-        exp_mean = np.load(f)
-    with open("map_solve_cho_ycov_output.npy", "rb") as f:
-        exp_cho_ycov = np.load(f)
 
     # Compare calculated and expected results.
     assert_allclose(calc_mean, exp_mean)
@@ -233,27 +242,10 @@ def test_map_solve_against_data(data):
 
 
 # 22/7 -> pass
-def test_map_solve_compare_starry(data):
+def test_map_solve_compare_starry(saved_input_data):
 
     # Load the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
-    with open("map_solve_S_input.npy", "rb") as f:
-        S = np.load(f)
-    with open("map_solve_flux_input.npy", "rb") as f:
-        flux = np.load(f)
-    with open("map_solve_cho_C_input.npy", "rb") as f:
-        cho_C = np.load(f)
-    with open("map_solve_mu_input.npy", "rb") as f:
-        mu = np.load(f)
-    with open("map_solve_invL_input.npy", "rb") as f:
-        invL = np.load(f)
-    
-    # Convert them to jax arrays?
-    S = jnp.array(S)
-    flux = jnp.array(flux)
-    cho_C = jnp.array(cho_C)
-    mu = jnp.array(mu)
-    invL = jnp.array(invL)
+    S, flux, cho_C, mu, invL = saved_input_data
 
     # Get calculated outputs.
     calc_mean, calc_cho_ycov = map_solve(S, flux, cho_C, mu, invL)
@@ -267,20 +259,19 @@ def test_map_solve_compare_starry(data):
 
 
 # 22/7 -> pass
-def test_solve_for_map_linear_against_data(data):
+def test_solve_for_map_linear_against_data(generated_data, saved_output_data):
 
     # Load the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, fix_spectrum, normalized, baseline_var, S, _S0e2i = generated_data
     T = 1
-    baseline_var = 0
-    S = "dummy"
+    # TODO: S is dummy variable, passed in but not used until my functions are combined with Tiger's.
 
     # Process the inputs.
     processed_inputs = process_inputs(
-        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i,
+        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, _S0e2i,
         normalized=False, flux_err=flux_err,
     )
-    flux = processed_inputs["flux"] # doesn't change in this case
+    # flux = processed_inputs["flux"] # doesn't change in this case
     spatial_mean = processed_inputs["spatial_mean"]
     spatial_inv_cov = processed_inputs["spatial_inv_cov"]
     flux_err = processed_inputs["flux_err"]
@@ -291,10 +282,7 @@ def test_solve_for_map_linear_against_data(data):
     )
 
     # Load saved expected outputs.
-    with open("map_solve_mean_output.npy", "rb") as f:
-        exp_mean = np.load(f)
-    with open("map_solve_cho_ycov_output.npy", "rb") as f:
-        exp_cho_ycov = np.load(f)
+    exp_mean, exp_cho_ycov = saved_output_data
     exp_y = np.transpose(np.reshape(exp_mean, (map.nc, map.Ny)))
 
     # Compare calculated and expected results.
@@ -303,20 +291,19 @@ def test_solve_for_map_linear_against_data(data):
 
 
 # 22/7 -> pass
-def test_solve_for_map_linear_compare_starry(data):
+def test_solve_for_map_linear_compare_starry(generated_data):
 
     # Load the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, fix_spectrum, normalized, baseline_var, S, _S0e2i = generated_data
     T = 1
-    baseline_var = 0
-    S = "dummy"
+    # TODO: S is dummy variable, passed in but not used until my functions are combined with Tiger's.
 
     # Process the inputs.
     processed_inputs = process_inputs(
-        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i,
+        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, _S0e2i,
         normalized=False, flux_err=flux_err,
     )
-    flux = processed_inputs["flux"] # doesn't change in this case
+    # flux = processed_inputs["flux"] # doesn't change in this case
     spatial_mean = processed_inputs["spatial_mean"]
     spatial_inv_cov = processed_inputs["spatial_inv_cov"]
     flux_err = processed_inputs["flux_err"]
@@ -326,12 +313,11 @@ def test_solve_for_map_linear_compare_starry(data):
         spatial_mean, spatial_inv_cov, flux_err, map.nt, map.nw, baseline_var, T, flux, S, map.nc, map.Ny,
     )
 
-    # TODO: Fix spectrum is None error.
     # Get expected outputs.
     map._solver.theta = theta * _angle_factor
     map._solver.process_inputs(flux, normalized=False, fix_spectrum=True, flux_err=flux_err)
     map._solver.spectrum_ = map.spectrum_
-    map._solver.solve_for_map_linear() # --> ERROR: self.spectrum is None when design_matrix() is called
+    map._solver.solve_for_map_linear()
 
     exp_y = map._solver.y
     exp_cho_ycov = map._solver.cho_ycov
@@ -342,25 +328,19 @@ def test_solve_for_map_linear_compare_starry(data):
 
 
 # 22/7 -> pass
-def test_solve_bilinear_against_data(data):
+def test_solve_bilinear_against_data(generated_data, saved_output_data):
 
     # Process the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
-    fix_spectrum = True
-    normalized = False
-    baseline_var = 0
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, fix_spectrum, normalized, baseline_var, S, _S0e2i = generated_data
 
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve_bilinear(
-        flux, map._nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, flux_err, normalized,
+        flux, map._nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, _S0e2i, flux_err, normalized,
         fix_spectrum, baseline_var, S,
     )
 
     # Load saved expected outputs.
-    with open("map_solve_mean_output.npy", "rb") as f:
-        exp_mean = np.load(f)
-    with open("map_solve_cho_ycov_output.npy", "rb") as f:
-        exp_cho_ycov = np.load(f)
+    exp_mean, exp_cho_ycov = saved_output_data
     exp_y = np.transpose(np.reshape(exp_mean, (map.nc, map.Ny)))
 
     # Compare calculated and expected results.
@@ -369,29 +349,25 @@ def test_solve_bilinear_against_data(data):
 
 
 # 22/7 -> pass
-def test_solve_bilinear_compare_starry(data):
+def test_solve_bilinear_compare_starry(generated_data):
 
     # Process the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
-    fix_spectrum = True
-    normalized = False
-    baseline_var = 0
-
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, fix_spectrum, normalized, baseline_var, S, _S0e2i = generated_data
     theta = theta * _angle_factor
 
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve_bilinear(
-        flux, map._nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, flux_err, normalized,
+        flux, map._nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, _S0e2i, flux_err, normalized,
         fix_spectrum, baseline_var, S,
     )
 
     # Get expected outputs.
     metadata = map._solver.solve_bilinear(
-                flux, theta, map.y, map.spectrum_, map._veq, map._inc, map._u,
-                fix_spectrum=True,
-                flux_err=flux_err,
-                normalized=False,
-            )
+        flux, theta, map.y, map.spectrum_, map._veq, map._inc, map._u,
+        fix_spectrum=True,
+        flux_err=flux_err,
+        normalized=False,
+    )
     
     exp_y = metadata["y"]
     exp_cho_ycov = metadata["cho_ycov"]
@@ -401,28 +377,24 @@ def test_solve_bilinear_compare_starry(data):
     assert_allclose(calc_cho_ycov, exp_cho_ycov)
 
 
-def test_solve_against_data(data):
+def test_solve_against_data():
 
     pass
 
 
 # 22/7 -> pass
-def test_solve_compare_starry(data):
+def test_solve_compare_starry(generated_data):
 
     # Process the inputs.
-    map, theta, _angle_factor, flux, flux_err, wav, wav0, S = data
-    fix_spectrum = True
-    normalized = False
-    baseline_var = 0
+    map, theta, _angle_factor, flux, flux_err, wav, wav0, fix_spectrum, normalized, baseline_var, S, _S0e2i = generated_data
 
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve(
-        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, map._S0e2i, flux_err, normalized,
+        flux, map.nt, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, _S0e2i, flux_err, normalized,
         fix_spectrum, baseline_var, S,
         theta, _angle_factor,
     )
 
-    # NOTE: To get expected outputs, can either call starry function OR load saved data.
     # Get expected outputs.
     exp_solution = map.solve(
         flux, theta=theta, normalized=False, fix_spectrum=True, flux_err=flux_err, quiet="false"

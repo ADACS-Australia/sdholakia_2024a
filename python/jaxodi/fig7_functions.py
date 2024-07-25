@@ -4,7 +4,7 @@ Functions for Figure 7's map.solve()
 
 from typing import Tuple
 # from collections.abc import Callable
-# from functools import partial
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -12,12 +12,6 @@ import numpy as np
 import scipy
 
 from jaxoplanet.types import Array
-
-# To generate variables ---
-# import paparazzi
-import starry
-
-from jaxodi.paparazzi.src.scripts.utils.generate import generate_data
 
 
 # Functions
@@ -31,13 +25,13 @@ from jaxodi.paparazzi.src.scripts.utils.generate import generate_data
 #   - solve
 
 
-# @jax.jit
+@jax.jit
 def cho_solve(A: Array, b: Array) -> Array:
     b_ = jax.scipy.linalg.solve_triangular(A, b, lower=True)
     return jax.scipy.linalg.solve_triangular(jnp.transpose(A), b_, lower=False)
 
 
-# @jax.jit
+@jax.jit
 def map_solve(
     X: Array,
     flux: Array,
@@ -95,6 +89,7 @@ def map_solve(
     return yhat, cho_ycov
 
 
+@partial(jax.jit, static_argnames=("nt", "nw", "nc", "Ny", "nw0", "nw0_"))
 def process_inputs(
         flux: Array,
         nt: int,
@@ -140,9 +135,9 @@ def process_inputs(
     # Flux must be a matrix (nt, nw)
     # if nt == 1:
     # else:
-    assert jnp.array_equal(
-        jnp.shape(flux), jnp.array([nt, nw])
-    ), "Invalid shape for `flux`."
+    # assert jnp.array_equal(
+    #     jnp.shape(flux), jnp.array([nt, nw])
+    # ), "Invalid shape for `flux`."
 
     # Flux error may be a scalar, a vector, or a matrix (nt, nw)
     flux_err = jnp.array(flux_err)
@@ -251,7 +246,7 @@ def process_inputs(
         T = jnp.logspace(logT0, logTf, nlogT)
 
     # Are we lucky enough to do a purely linear solve for the map?
-    linear = (not normalized) or (baseline is not None)
+    linear = jnp.logical_or(jnp.logical_not(normalized), baseline is not None)
 
     processed_inputs = {}
 
@@ -368,6 +363,7 @@ def _get_S(theta, _angle_factor, fix_spectrum, spectrum_):
     return dm
 
 
+@partial(jax.jit, static_argnames=("nt", "nw", "nc", "Ny"))
 def solve_for_map_linear(
         spatial_mean: Array,
         spatial_inv_cov: Array,
@@ -394,8 +390,12 @@ def solve_for_map_linear(
         flux_err = flux_err * jnp.ones((nt, nw))
 
     # Factorised data covariance
-    if baseline_var == 0:
-        cho_C = jnp.reshape(jnp.sqrt(T) * flux_err, (-1,))
+    # cho_C = jnp.where(
+    #     jnp.equal(baseline_var, 0),
+    #     jnp.reshape(jnp.sqrt(T) * flux_err, (-1,)),
+    #     None
+    # )
+    cho_C = jnp.reshape(jnp.sqrt(T) * flux_err, (-1,))
 
     # Unroll the data into a vector
     flux = jnp.reshape(flux, (-1,))
@@ -415,6 +415,7 @@ def solve_for_map_linear(
     return y, cho_ycov
 
 
+@jax.jit
 def get_default_theta(
         theta: Array,
         _angle_factor: float,
@@ -423,6 +424,7 @@ def get_default_theta(
     return theta * _angle_factor
 
 
+@partial(jax.jit, static_argnames=("nt", "nw", "nc", "Ny", "nw0", "nw0_", "fix_spectrum"))
 def solve_bilinear(
         # pass to process_inputs()
         flux: Array,
@@ -457,17 +459,15 @@ def solve_bilinear(
     flux_err = processed_inputs["flux_err"]
     # T = processed_inputs["T"]
 
-    if fix_spectrum:
-        if linear:
-            y, cho_ycov = solve_for_map_linear(
-                spatial_mean, spatial_inv_cov, flux_err, nt, nw, baseline_var, 1, flux, S, nc, Ny,
-            )
-    #     else:
-    # else:
+    # if fix_spectrum and linear:
+    y, cho_ycov = solve_for_map_linear(
+        spatial_mean, spatial_inv_cov, flux_err, nt, nw, baseline_var, 1, flux, S, nc, Ny,
+    )
     
     return y, cho_ycov
 
 
+@partial(jax.jit, static_argnames=("nt", "nw", "nc", "Ny", "nw0", "nw0_", "fix_spectrum"))
 def solve(
         flux: Array,
         nt: int,

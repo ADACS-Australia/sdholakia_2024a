@@ -41,26 +41,7 @@ starry_solution = map.solve(
     quiet=os.getenv("CI", "false") == "true",
 )
 
-# # Get the inferred map
-# starry_y_inferred = map.y
-
-# # Compute the Ylm expansion of the posterior standard deviation field
-# P = map.sht_matrix(inverse=True)
-# Q = map.sht_matrix()
-# L = np.tril(soln["cho_ycov"])
-# W = P @ L
-# y_uncert = Q @ np.sqrt(np.diag(W @ W.T))
-
-# # Plot the maps
-# starry_fig = plot_maps(y_true, starry_y_inferred)
-# starry_fig.savefig("paparazzi/src/tex/figures/spot_infer_y_maps_starry.pdf", bbox_inches="tight", dpi=150)
-
-# # Plot the timeseries
-# s_fig = plot_timeseries(data, starry_y_inferred, spectrum_true, normalized=False)
-# s_fig.savefig("paparazzi/src/tex/figures/spot_infer_y_starry_timeseries.pdf", bbox_inches="tight", dpi=300)
-
-
-# --------------- jaxodi ---------------
+# Compute needed data
 wav = data["kwargs"]["wav"]
 wav0 = data["kwargs"]["wav0"]
 vsini_max = 50000
@@ -118,8 +99,11 @@ jaxodi_y_inferred, jaxodi_cho_ycov = solve(
     theta, _angle_factor,
 )
 
+# Reshape for plotting function
+jaxodi_y_inferred = jnp.squeeze(jaxodi_y_inferred)
+
 # Plot the maps
-jaxodi_fig = plot_maps(y_true, jnp.squeeze(jaxodi_y_inferred))
+jaxodi_fig = plot_maps(y_true, jaxodi_y_inferred)
 jaxodi_fig.savefig("paparazzi/src/tex/figures/spot_infer_y_maps_jaxodi.pdf", bbox_inches="tight", dpi=150)
-j_fig = plot_timeseries(data, jnp.squeeze(jaxodi_y_inferred), spectrum_true, normalized=False)
+j_fig = plot_timeseries(data, jaxodi_y_inferred, spectrum_true, normalized=False)
 j_fig.savefig("paparazzi/src/tex/figures/spot_infer_y_jaxodi_timeseries.pdf", bbox_inches="tight", dpi=300)

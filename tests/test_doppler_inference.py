@@ -12,7 +12,6 @@ import scipy
 from jaxoplanet.types import Array
 from jaxoplanet.test_utils import assert_allclose
 
-# To generate variables ---
 import starry
 from starry._core.math import greedy_linalg
 
@@ -72,18 +71,6 @@ map.spectrum = data["truths"]["spectrum"]
 
 vsini_max = 50000
 nt = 16
-ydeg = 15
-udeg = 0  # Tiger has set at 0 -> no limb darkening.
-xamp = map.ops.xamp
-nwp = map.ops.nwp
-
-_angle_factor = np.pi / 180
-fix_spectrum = True
-normalized = False
-baseline_var = 0
-_S0e2i = jnp.array(map._S0e2i.toarray())
-_interp = True
-
 xamp = map.ops.xamp # (253,)
 nwp = map.ops.nwp # 603
 vsini = map.vsini # 38567.256581192356
@@ -92,66 +79,13 @@ udeg = map.udeg # 0
 nk = map.ops.nk # 253
 nw = 351 # != map.nw = 70
 
-# veq = 60000
-# inc = 40
-# nc = 1
-# Ny = 256
-# Nu = 3
-# N = 324
-# nw = 70 # <- also 351
-# nw0 = 300
-# nw0_ = 603
-
-# ------------------------
-# Much code for setting S.
-nw = 351
-vsini_max = 50000
-wav1 = np.min(wav)
-wav2 = np.max(wav)
-wavr = np.exp(0.5 * (np.log(wav1) + np.log(wav2)))
-log_wav = jnp.linspace(np.log(wav1 / wavr), jnp.log(wav2 / wavr), nw)
-wav_int = wavr * np.exp(log_wav)
-interp_tol = 1e-12
-_clight = 299792458.0  # m/s
-dlam = log_wav[1] - log_wav[0]
-betasini_max = vsini_max / _clight
-hw = jnp.array(
-    np.ceil(
-        0.5
-        * jnp.abs(jnp.log((1 + betasini_max) / (1 - betasini_max)))
-        / dlam
-    ),
-    dtype="int32",
-)
-x = jnp.arange(0, hw + 1) * dlam
-pad_l = log_wav[0] - hw * dlam + x[:-1]
-pad_r = log_wav[-1] + x[1:]
-log_wav0_int = jnp.concatenate([pad_l, log_wav, pad_r])
-wav0_int = wavr * jnp.exp(log_wav0_int)
-wav0 = jnp.array(wav0)
-# nw0 = len(wav0)
-# nwp = len(log_wav0_int)
-
-S = map._get_spline_operator(wav_int, wav)
-S[np.abs(S) < interp_tol] = 0
-S = scipy.sparse.csr_matrix(S)
-# _Si2eTr = map._math.sparse_cast(S.T)
-_Si2eBlk = map._math.sparse_cast(
-    scipy.sparse.block_diag([S for n in range(nt)], format="csr")
-)
-S = map._get_spline_operator(wav0_int, wav0)
-S[np.abs(S) < interp_tol] = 0
-S = scipy.sparse.csr_matrix(S)
-S = map._get_spline_operator(wav, wav_int)
-S[np.abs(S) < interp_tol] = 0
-S = scipy.sparse.csr_matrix(S)
-S = map._get_spline_operator(wav0, wav0_int)
-S[np.abs(S) < interp_tol] = 0
-S = scipy.sparse.csr_matrix(S)
-
-S = jnp.array(S.toarray())
-_Si2eBlk = jnp.array(_Si2eBlk.toarray())
-
+_angle_factor = np.pi / 180
+fix_spectrum = True
+normalized = False
+_interp = True
+baseline_var = 0
+_S0e2i = jnp.array(map._S0e2i.toarray())
+_Si2eBlk = jnp.array(map._Si2eBlk.toarray())
 
 
 def test_get_D_fixed_spectrum():

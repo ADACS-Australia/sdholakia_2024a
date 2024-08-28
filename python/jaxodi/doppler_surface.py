@@ -8,14 +8,14 @@ import equinox as eqx
 from jaxoplanet.experimental.starry.ylm import Ylm
 from jaxoplanet.types import Array
 
-# from jaxodi.doppler_forward import (
-#     get_x,
-#     get_rT,
-#     get_kT0,
-#     get_kT,
-#     dot_design_matrix_fixed_map_into,
-#     get_flux_from_dotconv,
-# )
+from jaxodi.doppler_forward import (
+    get_x,
+    get_rT,
+    get_kT0,
+    get_kT,
+    dot_design_matrix_fixed_map_into,
+    get_flux_from_dotconv,
+)
 
 
 class DopplerWav(eqx.Module):
@@ -147,12 +147,29 @@ class DopplerWav(eqx.Module):
         ]
         return lam_kernel
 
+    @property
+    def xamp(self):
+        xamp = (
+            self.clight
+            * (np.exp(-2 * self.lam_kernel) - 1)
+            / (np.exp(-2 * self.lam_kernel) + 1)
+        )
+        return xamp
+
 
 class DopplerSurface(eqx.Module):
-    y: Ylm
+    theta: Array
     nt: Array
-    wav: Array
-    veq: Array
-    spectrum: Array
-    inc: Array = 90.0
-    obl: Array = 0.0
+    inc: Array
+    obl: Array
+
+    def __init__(self, theta, inc=np.pi / 2, obl=0):
+        self.theta = theta
+        self.nt = len(theta)
+        self.inc = inc
+        self.obl = obl
+
+    def __call__(self, y: Ylm, wav: DopplerWav):
+        ydeg = y.ell_max
+        kT = get_kT(wav.xamp, wav.vsini_max, ydeg, 0, wav.nk, self.inc, self.theta)
+        return kT

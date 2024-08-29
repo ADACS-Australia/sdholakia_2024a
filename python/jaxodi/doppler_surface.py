@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+from scipy.interpolate import InterpolatedUnivariateSpline as Spline
 import jax
 import jax.numpy as jnp
 import equinox as eqx
@@ -156,6 +157,37 @@ class DopplerWav(eqx.Module):
         )
         return xamp
 
+    def _get_spline_operator(self, input_grid, output_grid):
+        S = np.zeros((len(output_grid), len(input_grid)))
+        for n in range(len(input_grid)):
+            y = np.zeros_like(input_grid)
+            y[n] = 1.0
+            S[:, n] = Spline(input_grid, y, k=1)(output_grid)
+        return S
+
+    # todo: double check interpolation calculations
+    @property
+    def S0(self):
+        return self._get_spline_operator(self.wav0_int, self.wav0)
+
+    @property
+    def ST0(self):
+        return self.S0.T
+
+    def get_spec0_int(self, spec0):
+        assert len(spec0) == self.nw0
+        spec0_cast = spec0.reshape((1, self.nw0))
+        spec0_int = np.dot(spec0_cast, self.S0)
+        return spec0_int
+
+
+# class DopplerSpec(eqx.Module):
+#     nc: Array
+#     wav: DopplerWav
+#     spec0_int: Array
+
+#     def __init__(self, wav: DopplerWav, nc)
+
 
 class DopplerSurface(eqx.Module):
     theta: Array
@@ -169,7 +201,13 @@ class DopplerSurface(eqx.Module):
         self.inc = inc
         self.obl = obl
 
-    def __call__(self, y: Ylm, wav: DopplerWav):
+    def __call__(self, y: Ylm, wav: DopplerWav, spec0: Array):
         ydeg = y.ell_max
         kT = get_kT(wav.xamp, wav.vsini_max, ydeg, 0, wav.nk, self.inc, self.theta)
-        return kT
+        spec0_int = wav.get_spec0_int(spec0)
+        nc = 1
+        flux = dot_design_matrix_fixed_map_into(
+            kT, y.todense(), nc, wav.nw0_int, self.nt, wav.nk, wav.nw_int, spec0_int
+        )
+        res = get_flux_from_dotconv(flux, self.nt, wav.nw_int)
+        return res

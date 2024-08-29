@@ -21,14 +21,18 @@ from jaxodi.doppler_forward import (
 
 class DopplerWav(eqx.Module):
     wav: Array
-    vsini_max: Array
+    vsini_max: Array = eqx.field(static=True)
+    nw_int: int = eqx.field(static=True)
+    nw0_int: int = eqx.field(static=True)
+    nk: int = eqx.field(static=True)
+    xamp: Array
 
     # constants
     clight = 299792458.0  # m/s
 
     # default value
     default_vsini_max = 1.0e5  # m/s
-    default_wav = np.linspace(642.75, 643.25, 200)  # FeI 6430
+    default_wav = jnp.linspace(642.75, 643.25, 200)  # FeI 6430
 
     def __init__(self, wav: Array | None = None, vsini_max: Array | None = None):
         if wav is None:
@@ -39,6 +43,10 @@ class DopplerWav(eqx.Module):
 
         self.wav = wav
         self.vsini_max = vsini_max
+        self.nw_int = self._nw_int
+        self.nw0_int = self._nw0_int
+        self.nk = self._nk
+        self.xamp = self._xamp
 
     @property
     def nw(self):
@@ -46,7 +54,7 @@ class DopplerWav(eqx.Module):
         return len(self.wav)
 
     @property
-    def nw_int(self):
+    def _nw_int(self):
         """The number of wavelength bins in the internal grid"""
         nw = len(self.wav)
         if (nw % 2) == 0:
@@ -56,33 +64,33 @@ class DopplerWav(eqx.Module):
     @property
     def wav1(self):
         """minimum wavelength"""
-        wav1 = np.min(self.wav)
+        wav1 = jnp.min(self.wav)
         return wav1
 
     @property
     def wav2(self):
         """maximum wavelength"""
-        wav2 = np.max(self.wav)
+        wav2 = jnp.max(self.wav)
         return wav2
 
     @property
     def wavr(self):
         """Reference wavelength"""
-        wavr = np.exp(
-            0.5 * (np.log(self.wav1) + np.log(self.wav2))
+        wavr = jnp.exp(
+            0.5 * (jnp.log(self.wav1) + jnp.log(self.wav2))
         )  # reference wavelength
         return wavr
 
     @property
     def log_wav_int(self):
-        log_wav_int = np.linspace(
-            np.log(self.wav1 / self.wavr), np.log(self.wav2 / self.wavr), self.nw_int
+        log_wav_int = jnp.linspace(
+            jnp.log(self.wav1 / self.wavr), jnp.log(self.wav2 / self.wavr), self.nw_int
         )
         return log_wav_int
 
     @property
     def wav_int(self):
-        wav_int = self.wavr * np.exp(self.log_wav_int)
+        wav_int = self.wavr * jnp.exp(self.log_wav_int)
         return wav_int
 
     @property
@@ -95,10 +103,10 @@ class DopplerWav(eqx.Module):
     def hw(self):
         """number of bins of half-wavelength of the kernel"""
         betasini_max = self.vsini_max / self.clight
-        hw = np.array(
-            np.ceil(
+        hw = jnp.array(
+            jnp.ceil(
                 0.5
-                * np.abs(np.log((1 + betasini_max) / (1 - betasini_max)))
+                * jnp.abs(jnp.log((1 + betasini_max) / (1 - betasini_max)))
                 / self.dlam
             ),
             dtype="int32",
@@ -107,29 +115,29 @@ class DopplerWav(eqx.Module):
 
     @property
     def log_wav0_int(self):
-        x = np.arange(0, self.hw + 1) * self.dlam
+        x = jnp.arange(0, self.hw + 1) * self.dlam
         pad_l = self.log_wav_int[0] - self.hw * self.dlam + x[:-1]
         pad_r = self.log_wav_int[-1] + x[1:]
-        log_wav0_int = np.concatenate([pad_l, self.log_wav_int, pad_r])
+        log_wav0_int = jnp.concatenate([pad_l, self.log_wav_int, pad_r])
         return log_wav0_int
 
     @property
     def wav0_int(self):
-        wav0_int = self.wavr * np.exp(self.log_wav0_int)
+        wav0_int = self.wavr * jnp.exp(self.log_wav0_int)
         return wav0_int
 
     @property
-    def nw0_int(self):
+    def _nw0_int(self):
         return len(self.wav0_int)
 
     @property
     def wav0(self):
-        delta_wav = np.median(np.diff(np.sort(self.wav)))
-        pad_l = np.arange(self.wav1, self.wav0_int[0] - delta_wav, -delta_wav)
+        delta_wav = jnp.median(jnp.diff(jnp.sort(self.wav)))
+        pad_l = jnp.arange(self.wav1, self.wav0_int[0] - delta_wav, -delta_wav)
         pad_l = pad_l[::-1][:-1]
-        pad_r = np.arange(self.wav2, self.wav0_int[-1] + delta_wav, delta_wav)
+        pad_r = jnp.arange(self.wav2, self.wav0_int[-1] + delta_wav, delta_wav)
         pad_r = pad_r[1:]
-        wav0 = np.concatenate([pad_l, self.wav, pad_r])
+        wav0 = jnp.concatenate([pad_l, self.wav, pad_r])
         return wav0
 
     @property
@@ -137,7 +145,7 @@ class DopplerWav(eqx.Module):
         return len(self.wav0)
 
     @property
-    def nk(self):
+    def _nk(self):
         nk = 2 * self.hw + 1
         return nk
 
@@ -149,11 +157,11 @@ class DopplerWav(eqx.Module):
         return lam_kernel
 
     @property
-    def xamp(self):
+    def _xamp(self):
         xamp = (
             self.clight
-            * (np.exp(-2 * self.lam_kernel) - 1)
-            / (np.exp(-2 * self.lam_kernel) + 1)
+            * (jnp.exp(-2 * self.lam_kernel) - 1)
+            / (jnp.exp(-2 * self.lam_kernel) + 1)
         )
         return xamp
 
@@ -174,19 +182,24 @@ class DopplerWav(eqx.Module):
     def ST0(self):
         return self.S0.T
 
-    def get_spec0_int(self, spec0):
-        assert len(spec0) == self.nw0
-        spec0_cast = spec0.reshape((1, self.nw0))
-        spec0_int = np.dot(spec0_cast, self.S0)
+
+class DopplerSpec(eqx.Module):
+    nc: Array = eqx.field(static=True)
+    spec0_int: Array = eqx.field(converter=jnp.asarray)
+
+    def __init__(self, wav: DopplerWav, spec0, nc=1, interp=True):
+        self.nc = nc
+        self.spec0_int = self._spec0_int(spec0, wav, nc, interp)
+
+    def _spec0_int(self, spec0, wav, nc, interp):
+        # todo: implement 2d spectrum with nc > 1
+        assert len(spec0) == wav.nw0
+        spec0_cast = spec0[np.newaxis, :]
+        if interp:
+            spec0_int = np.dot(spec0_cast, wav.S0)
+        else:
+            spec0_int = spec0_cast
         return spec0_int
-
-
-# class DopplerSpec(eqx.Module):
-#     nc: Array
-#     wav: DopplerWav
-#     spec0_int: Array
-
-#     def __init__(self, wav: DopplerWav, nc)
 
 
 class DopplerSurface(eqx.Module):

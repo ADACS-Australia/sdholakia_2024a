@@ -15,8 +15,6 @@ from jaxoplanet.test_utils import assert_allclose
 import starry
 from starry._core.math import greedy_linalg
 
-from jaxodi.paparazzi.src.scripts.utils.generate import generate_data
-
 from jaxodi.doppler_inference import (
     get_kT,
     get_D_fixed_spectrum,
@@ -54,21 +52,52 @@ def saved_input_data():
     return (S, flux, cho_C, mu, invL)
 
 
-data = generate_data(u=[]) # get_kT doesn't yet have limb darkening implemented
+# Set the seed.
+np.random.seed(0)
 
-# data
-theta = data["data"]["theta"] # np.linspace(-180, 180, nt=16, endpoint=False)
-flux = data["data"]["flux0"]
-flux_err = data["data"]["flux0_err"]
+# Set arguments for instantiating a Doppler map.
+kwargs = dict(
+    ydeg=15,
+    udeg=0,
+    nc=1,
+    veq=60000,
+    inc=40,
+    vsini_max=50000,
+    nt=16,
+    wav=np.linspace(642.85, 643.15, 70),
+    wav0=np.linspace(642.74, 643.26, 300),
+)
 
-# kwargs
-wav = data["kwargs"]["wav"] # array (70,1)
-wav0 = data["kwargs"]["wav0"]
+# Instantiate the Doppler map.
+map = starry.DopplerMap(lazy=False, **kwargs)
 
-# Instantiate the map
-map = starry.DopplerMap(lazy=False, **data["kwargs"])
-map.spectrum = data["truths"]["spectrum"]
+# No limb darkening at this stage.
+# get_kT doesn't yet have limb darkening implemented.
 
+# Rest frame spectrum.
+spectrum = (
+    1.0
+    - 0.85 * np.exp(-0.5 * (map.wav0 - 643.0) ** 2 / 0.0085 ** 2)
+    - 0.40 * np.exp(-0.5 * (map.wav0 - 642.97) ** 2 / 0.0085 ** 2)
+    - 0.20 * np.exp(-0.5 * (map.wav0 - 643.1) ** 2 / 0.0085 ** 2)
+)
+
+# Load the component maps.
+map.load(spectra=spectrum, smoothing=0.075)
+
+# Get rotational phases.
+theta = np.linspace(-180, 180, map.nt, endpoint=False)
+
+# Generate unnormalized data. Scale the error so it's
+# the same magnitude relative to the baseline as the
+# error in the normalized dataset so we can more easily
+# compare the inference results in both cases.
+flux_err = 2e-4
+flux = map.flux(theta=theta, normalize=False)
+flux_err = flux_err * np.median(flux)
+flux += flux_err * np.random.randn(*flux.shape)
+
+# Set test data.
 vsini_max = 50000
 nt = 16
 xamp = map.ops.xamp # (253,)
@@ -121,8 +150,7 @@ def test_sparse_dot():
 
 def test_design_matrix():
 
-    _interp = True
-    theta = data["data"]["theta"]
+    # _interp = True
     theta_ = theta / _angle_factor
 
     # Get calculated output.
@@ -216,9 +244,6 @@ def test_map_solve(saved_input_data):
 def test_solve_for_map_linear():
 
     T = 1
-    flux_err = data["data"]["flux0_err"]
-
-    theta = data["data"]["theta"]
     theta_ = theta * _angle_factor
 
     # Process the inputs.
@@ -229,18 +254,18 @@ def test_solve_for_map_linear():
     # flux = processed_inputs["flux"] # doesn't change in this case
     spatial_mean = processed_inputs["spatial_mean"]
     spatial_inv_cov = processed_inputs["spatial_inv_cov"]
-    flux_err = processed_inputs["flux_err"]
+    flux_err_ = processed_inputs["flux_err"]
 
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve_for_map_linear(
-        spatial_mean, spatial_inv_cov, flux_err, map.nt, nw, map.nw, T, flux,
+        spatial_mean, spatial_inv_cov, flux_err_, map.nt, nw, map.nw, T, flux,
         theta_, _angle_factor, xamp, vsini, ydeg, udeg, nk, map._inc, map._spectrum,
         map.nc, nwp, map.Ny, _interp, _Si2eBlk, fix_spectrum,
     )
 
     # Get expected outputs.
     map._solver.theta = theta * _angle_factor
-    map._solver.process_inputs(flux, normalized=False, fix_spectrum=True, flux_err=flux_err)
+    map._solver.process_inputs(flux, normalized=False, fix_spectrum=True, flux_err=flux_err_)
     map._solver.spectrum_ = map.spectrum_
     map._solver.solve_for_map_linear()
 
@@ -255,7 +280,6 @@ def test_solve_for_map_linear():
 # 22/7 -> pass
 def test_solve_bilinear():
 
-    theta = data["data"]["theta"]
     theta_ = theta * _angle_factor
 
     # Get calculated outputs.

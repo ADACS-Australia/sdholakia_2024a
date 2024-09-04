@@ -38,7 +38,7 @@ jax.config.update("jax_enable_x64", True)
 @pytest.fixture(autouse=True)
 def saved_input_data():
 
-    with open("/sdholakia_2024a/tests/map_solve_S_input.npy", "rb") as f:
+    with open("/tests/map_solve_S_input.npy", "rb") as f:
         S = jnp.load(f)
     with open("sdholakia_2024a/tests/map_solve_flux_input.npy", "rb") as f:
         flux = jnp.load(f)

@@ -65,15 +65,15 @@ cwd = os.getcwd()
 @pytest.fixture(autouse=True)
 def saved_input_data():
 
-    with open("/home/runner/work/sdholakia_2024a/sdholakia_2024a/tests/map_solve_S_input.npy", "rb") as f:
+    with open(f"{cwd}/tests/map_solve_S_input.npy", "rb") as f:
         S = jnp.load(f)
-    with open(f"{cwd}/map_solve_flux_input.npy", "rb") as f:
+    with open(f"{cwd}/tests/map_solve_flux_input.npy", "rb") as f:
         flux = jnp.load(f)
-    with open(f"{cwd}/map_solve_cho_C_input.npy", "rb") as f:
+    with open(f"{cwd}/tests/map_solve_cho_C_input.npy", "rb") as f:
         cho_C = jnp.load(f)
-    with open(f"{cwd}/map_solve_mu_input.npy", "rb") as f:
+    with open(f"{cwd}/tests/map_solve_mu_input.npy", "rb") as f:
         mu = jnp.load(f)
-    with open(f"{cwd}/map_solve_invL_input.npy", "rb") as f:
+    with open(f"{cwd}/tests/map_solve_invL_input.npy", "rb") as f:
         invL = jnp.load(f)
 
     return (S, flux, cho_C, mu, invL)

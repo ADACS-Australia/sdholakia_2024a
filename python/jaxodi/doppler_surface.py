@@ -10,17 +10,16 @@ from jaxoplanet.experimental.starry.ylm import Ylm
 from jaxoplanet.types import Array
 
 from jaxodi.doppler_forward import (
-    get_x,
-    get_rT,
-    get_kT0,
     get_kT,
     dot_design_matrix_fixed_map_into,
     get_flux_from_dotconv,
 )
 
+from jaxodi.utils import enforce_bounds
+
 
 class DopplerWav(eqx.Module):
-    wav: Array
+    wav: Array = eqx.field(static=True)
     vsini_max: Array = eqx.field(static=True)
     nw_int: int = eqx.field(static=True)
     nw0_int: int = eqx.field(static=True)
@@ -147,7 +146,7 @@ class DopplerWav(eqx.Module):
     @property
     def _nk(self):
         nk = 2 * self.hw + 1
-        return nk
+        return int(nk)
 
     @property
     def lam_kernel(self):
@@ -204,21 +203,25 @@ class DopplerSpec(eqx.Module):
 
 class DopplerSurface(eqx.Module):
     theta: Array
-    nt: Array
+    nt: Array = eqx.field(static=True)
     inc: Array
     obl: Array
+    veq: Array
 
-    def __init__(self, theta, inc=np.pi / 2, obl=0):
+    def __init__(self, theta, inc=np.pi / 2, obl=0, veq=0.0):
         self.theta = theta
         self.nt = len(theta)
         self.inc = inc
         self.obl = obl
+        self.veq = veq
 
-    def __call__(self, y: Ylm, wav: DopplerWav, spec0: Array):
+    def __call__(self, y: Ylm, wav: DopplerWav, spec0: DopplerSpec):
         ydeg = y.ell_max
-        kT = get_kT(wav.xamp, wav.vsini_max, ydeg, 0, wav.nk, self.inc, self.theta)
-        spec0_int = wav.get_spec0_int(spec0)
-        nc = 1
+        vsini = self.veq * jnp.sin(self.inc)
+        err, vsini = enforce_bounds(vsini, 0.0, wav.vsini_max)
+        kT = get_kT(wav.xamp, vsini, ydeg, 0, wav.nk, self.inc, self.theta)
+        spec0_int = spec0.spec0_int
+        nc = spec0.nc
         flux = dot_design_matrix_fixed_map_into(
             kT, y.todense(), nc, wav.nw0_int, self.nt, wav.nk, wav.nw_int, spec0_int
         )

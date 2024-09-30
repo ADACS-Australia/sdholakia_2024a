@@ -9,11 +9,17 @@ from jaxodi.doppler_forward import (
     get_flux_from_dotconv,
 )
 
+from jax.experimental import checkify
+
 
 def light_curve(y: Ylm, wav: DopplerWav, spec0: DopplerSpec, surface: DopplerSurface):
     ydeg = y.ell_max
     vsini = surface.veq * jnp.sin(surface.inc)
+
+    # check bounds at runtime
     err, vsini = enforce_bounds(vsini, 0.0, wav.vsini_max)
+    checkify.check_error(err)
+
     kT = get_kT(wav.xamp, vsini, ydeg, 0, wav.nk, surface.inc, surface.theta)
     spec0_int = spec0.spec0_int
     nc = spec0.nc

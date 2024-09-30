@@ -132,7 +132,7 @@ class TestForwardCore:
         )
         assert_allclose(kT, calc_kT)
 
-    def test_dot_design_matrix_fixed_map_into(self, kT, spec_matrix, dot_design_matrix):
+    def test_dot_design_matrix_fixed_map_into(self, kT, dot_design_matrix):
         # calculated result
         res = dot_design_matrix_fixed_map_into(
             kT,
@@ -142,7 +142,7 @@ class TestForwardCore:
             self.jsurface.nt,
             self.jwav.nk,
             self.jwav.nw_int,
-            spec_matrix,
+            self.jspec.spec0_int,
         )
         assert_allclose(dot_design_matrix, res)
 

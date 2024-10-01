@@ -3,6 +3,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import starry
+
+from jaxoplanet.experimental.starry.ylm import Ylm
+
 from jaxodi.doppler_forward import (
     dot_design_matrix_fixed_map_into,
     get_flux_from_dotconv,
@@ -37,6 +40,11 @@ def starry_doppler_map():
 
 
 @pytest.fixture
+def ylm():
+    return Ylm.from_dense(y_)
+
+
+@pytest.fixture
 def doppler_wav():
     return DopplerWav(vsini_max=veq)
 
@@ -48,8 +56,8 @@ def doppler_spec(doppler_wav):
 
 
 @pytest.fixture
-def doppler_surface():
-    return DopplerSurface(theta, veq=veq)
+def doppler_surface(ylm, doppler_wav, doppler_spec):
+    return DopplerSurface(ylm, doppler_wav, doppler_spec, theta, veq=veq)
 
 
 class TestForwardCore:

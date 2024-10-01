@@ -96,6 +96,8 @@ ignore = [
     "PLR0913", # Allow many arguments in function call
     "PLR0915", # Allow many statements
     "PLR2004", # Allow magic numbers in comparisons
+    "F401", # ignore at development stage
+    "I001", # ignore at development stage
 ]
 # exclude = []
 

@@ -164,7 +164,7 @@ def test_design_matrix():
 
     # Get calculated output.
     calc_dm = design_matrix(
-        theta_, _angle_factor, xamp, vsini, ydeg, udeg, nk, map._inc,
+        theta_, xamp, vsini, ydeg, udeg, nk, map._inc,
         map._spectrum, map.nc, nwp, map.nt, map.Ny, nw, _interp, _Si2eBlk, fix_spectrum=True
     )
 
@@ -196,7 +196,7 @@ def test_design_matrix():
 def test_get_default_theta():
 
     # Get calculated outputs.
-    calc_theta = get_default_theta(theta, _angle_factor)
+    calc_theta = get_default_theta(theta)
     
     # Get expected outputs.
     exp_theta = map._get_default_theta(theta)
@@ -268,7 +268,7 @@ def test_solve_for_map_linear():
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve_for_map_linear(
         spatial_mean, spatial_inv_cov, flux_err_, map.nt, nw, map.nw, T, flux,
-        theta_, _angle_factor, xamp, vsini, ydeg, udeg, nk, map._inc, map._spectrum,
+        theta_, xamp, vsini, ydeg, udeg, nk, map._inc, map._spectrum,
         map.nc, nwp, map.Ny, _interp, _Si2eBlk, fix_spectrum,
     )
 
@@ -294,7 +294,7 @@ def test_solve_bilinear():
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve_bilinear(
         flux, nt, nw, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, _S0e2i, flux_err, normalized,
-        theta_, _angle_factor, xamp, vsini, ydeg, udeg, nk, map._inc, map._spectrum,
+        theta_, xamp, vsini, ydeg, udeg, nk, map._inc, map._spectrum,
         nwp, _interp, _Si2eBlk, fix_spectrum,
     )
 
@@ -319,7 +319,7 @@ def test_solve():
     # Get calculated outputs.
     calc_y, calc_cho_ycov = solve(
         flux, map.nt, nw, map.nw, map.nc, map.Ny, map.nw0, map.nw0_, _S0e2i, flux_err, normalized,
-        theta, _angle_factor, xamp, vsini, ydeg, udeg, nk, map._inc, map._spectrum, nwp, _interp, _Si2eBlk, fix_spectrum,
+        theta, xamp, vsini, ydeg, udeg, nk, map._inc, map._spectrum, nwp, _interp, _Si2eBlk, fix_spectrum,
     )
 
     # Get expected outputs.

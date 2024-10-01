@@ -12,6 +12,8 @@ from functools import partial
 from jaxoplanet.types import Array
 from .doppler_forward import get_kT
 
+from jaxodi.utils import angle_factor
+
 
 @jax.jit
 def cho_solve(A: Array, b: Array) -> Array:
@@ -308,16 +310,15 @@ def sparse_dot(A, B):
 @jax.jit
 def get_default_theta(
         theta: Array,
-        _angle_factor: float,
     ) -> Array:
 
-    return theta * _angle_factor
+    return theta * angle_factor
 
 
 # Can't be jitted until sparse_dot is jitted
-@partial(jax.jit, static_argnames=("nt", "nw", "nc", "Ny", "nwp", "_angle_factor", "ydeg", "udeg", "nk"))
+@partial(jax.jit, static_argnames=("nt", "nw", "nc", "Ny", "nwp", "ydeg", "udeg", "nk"))
 def design_matrix(
-        theta, _angle_factor, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
+        theta, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
         nc, nwp, nt, Ny, nw, _interp, _Si2eBlk,
         fix_spectrum=True, fix_map=False
     ):
@@ -327,7 +328,7 @@ def design_matrix(
     This matrix dots into the spectral map to yield the model for the
     observed spectral timeseries (the ``flux``).
     """
-    theta = get_default_theta(theta, _angle_factor) # this is just undoing what get_S() did!
+    theta = get_default_theta(theta) # this is just undoing what get_S() did!
 
     # Compute the Doppler operator
     # if fix_spectrum:
@@ -343,23 +344,23 @@ def design_matrix(
     return D
 
 
-@partial(jax.jit, static_argnames=("nt", "nw", "nc", "Ny", "nwp", "_angle_factor", "ydeg", "udeg", "nk", "fix_spectrum"))
+@partial(jax.jit, static_argnames=("nt", "nw", "nc", "Ny", "nwp", "ydeg", "udeg", "nk", "fix_spectrum"))
 def _get_S(
-        theta, _angle_factor, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
+        theta, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
         nc, nwp, nt, Ny, nw, _interp, _Si2eBlk, fix_spectrum,
     ):
 
-    theta = theta / _angle_factor
+    theta = theta / angle_factor
 
     dm = design_matrix(
-        theta, _angle_factor, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
+        theta, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
         nc, nwp, nt, Ny, nw, _interp, _Si2eBlk, fix_spectrum=fix_spectrum
     )
 
     return dm
 
 
-@partial(jax.jit, static_argnames=("nt", "nw", "nw_", "nc", "Ny", "nwp", "_angle_factor", "ydeg", "udeg", "nk", "fix_spectrum"))
+@partial(jax.jit, static_argnames=("nt", "nw", "nw_", "nc", "Ny", "nwp", "ydeg", "udeg", "nk", "fix_spectrum"))
 def solve_for_map_linear(
         spatial_mean: Array,
         spatial_inv_cov: Array,
@@ -370,7 +371,6 @@ def solve_for_map_linear(
         T,
         flux: Array,
         theta: Array,
-        _angle_factor: float,
         xamp,
         vsini: float,
         ydeg: int,
@@ -410,7 +410,7 @@ def solve_for_map_linear(
 
     # Get S
     S = _get_S(
-        theta, _angle_factor, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
+        theta, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
         nc, nwp, nt, Ny, nw, _interp, _Si2eBlk, fix_spectrum,
     )
     
@@ -421,7 +421,7 @@ def solve_for_map_linear(
     return y, cho_ycov
 
 
-@partial(jax.jit, static_argnames=("nt", "nw", "nw_", "nc", "Ny", "nwp", "_angle_factor", "ydeg", "udeg", "nk", "nw0", "nw0_", "fix_spectrum"))
+@partial(jax.jit, static_argnames=("nt", "nw", "nw_", "nc", "Ny", "nwp", "ydeg", "udeg", "nk", "nw0", "nw0_", "fix_spectrum"))
 def solve_bilinear(
         # pass to process_inputs()
         flux: Array,
@@ -437,7 +437,6 @@ def solve_bilinear(
         normalized: bool,
         # pass to solve_for_map_linear()
         theta: Array,
-        _angle_factor: float,
         xamp,
         vsini: float,
         ydeg: int,
@@ -468,14 +467,14 @@ def solve_bilinear(
     # if fix_spectrum and linear:
     y, cho_ycov = solve_for_map_linear(
         spatial_mean, spatial_inv_cov, flux_err, nt, nw, nw_, 1, flux,
-        theta, _angle_factor, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
+        theta, xamp, vsini, ydeg, udeg, nk, inc, spectrum,
         nc, nwp, Ny, _interp, _Si2eBlk, fix_spectrum,
     )
     
     return y, cho_ycov
 
 
-@partial(jax.jit, static_argnames=("nt", "nw", "nw_", "nc", "Ny", "nwp", "_angle_factor", "ydeg", "udeg", "nk", "nw0", "nw0_", "fix_spectrum"))
+@partial(jax.jit, static_argnames=("nt", "nw", "nw_", "nc", "Ny", "nwp", "ydeg", "udeg", "nk", "nw0", "nw0_", "fix_spectrum"))
 def solve(
         flux: Array,
         nt: int,
@@ -489,7 +488,6 @@ def solve(
         flux_err: float,
         normalized: bool,
         theta: Array,
-        _angle_factor: float,
         xamp,
         vsini: float,
         ydeg: int,
@@ -509,12 +507,12 @@ def solve(
     """
 
     # Used to calculate S.
-    theta = get_default_theta(theta, _angle_factor)
+    theta = get_default_theta(theta)
 
     if solver.lower().startswith("bi"):
         y, cho_ycov = solve_bilinear(
             flux, nt, nw, nw_, nc, Ny, nw0, nw0_, S0e2i, flux_err, normalized,  # pass to process_inputs()
-            theta, _angle_factor, xamp, vsini, ydeg, udeg, nk, inc, spectrum,   # pass to solve_for_map_linear()
+            theta, xamp, vsini, ydeg, udeg, nk, inc, spectrum,   # pass to solve_for_map_linear()
             nwp, _interp, _Si2eBlk, fix_spectrum,
         )
     # else:

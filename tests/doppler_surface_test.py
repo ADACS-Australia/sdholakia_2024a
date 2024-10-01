@@ -5,6 +5,8 @@ import jax.numpy as jnp
 import numpy as np
 import starry
 
+from jaxoplanet.experimental.starry.ylm import Ylm
+
 from jaxodi.doppler_surface import DopplerWav, DopplerSpec, DopplerSurface
 
 from jaxoplanet.test_utils import assert_allclose
@@ -29,6 +31,11 @@ def starry_doppler_map():
 
 
 @pytest.fixture
+def ylm():
+    return Ylm.from_dense(y_)
+
+
+@pytest.fixture
 def doppler_wav():
     return DopplerWav(vsini_max=veq)
 
@@ -40,8 +47,8 @@ def doppler_spec(doppler_wav):
 
 
 @pytest.fixture
-def doppler_surface():
-    return DopplerSurface(theta, veq=veq)
+def doppler_surface(ylm, doppler_wav, doppler_spec):
+    return DopplerSurface(ylm, doppler_wav, doppler_spec, theta, veq=veq)
 
 
 class TestDopplerWav:
@@ -87,22 +94,22 @@ class TestDopplerWav:
         assert np.array_equal(self.jwav.xamp, self.smap.ops.xamp)
 
     def test_S0i2e(self):
-        assert jnp.allclose(self.jwav._S0i2e, self.smap._S0i2e.todense())
+        assert jnp.allclose(self.jwav._S0i2e, self.smap._S0i2e.toarray())
 
     def test_S0i2eTr(self):
-        assert jnp.allclose(self.jwav._S0i2eTr, self.smap._S0i2eTr.todense())
+        assert jnp.allclose(self.jwav._S0i2eTr, self.smap._S0i2eTr.toarray())
 
     def test_S0e2i(self):
-        assert jnp.allclose(self.jwav._S0e2i, self.smap._S0e2i.todense())
+        assert jnp.allclose(self.jwav._S0e2i, self.smap._S0e2i.toarray())
 
     def test_S0e2iTr(self):
-        assert jnp.allclose(self.jwav._S0e2iTr, self.smap._S0e2iTr.todense())
+        assert jnp.allclose(self.jwav._S0e2iTr, self.smap._S0e2iTr.toarray())
 
     def test_Si2eTr(self):
-        assert jnp.allclose(self.jwav._Si2eTr, self.smap._Si2eTr.todense())
+        assert jnp.allclose(self.jwav._Si2eTr, self.smap._Si2eTr.toarray())
 
     def test_Se2i(self):
-        assert np.allclose(self.jwav._Se2i, self.smap._Se2i.todense())
+        assert np.allclose(self.jwav._Se2i, self.smap._Se2i.toarray())
 
 
 class TestDopplerSpec:
@@ -123,3 +130,9 @@ class TestDopplerSurface:
 
     def test_theta(self):
         assert np.allclose(self.jsurface.theta, self.smap._get_default_theta(theta))
+
+    def test_Si2eBlk(self):
+        assert np.allclose(self.jsurface._Si2eBlk, self.smap._Si2eBlk.toarray())
+
+    def test_Si2eTrBlk(self):
+        assert np.allclose(self.jsurface._Si2eTrBlk, self.smap._Si2eTrBlk.toarray())

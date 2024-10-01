@@ -11,4 +11,4 @@ def enforce_bounds(x, lower=-jnp.inf, upper=jnp.inf, name="vsini"):
 
 
 def unit_radian(degree: Array):
-    return degree * jnp.pi / 180
+    return jnp.asarray(degree * jnp.pi / 180)

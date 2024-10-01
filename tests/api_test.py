@@ -30,6 +30,11 @@ def starry_doppler_map():
 
 
 @pytest.fixture
+def ylm():
+    return Ylm.from_dense(y_)
+
+
+@pytest.fixture
 def doppler_wav():
     return DopplerWav(vsini_max=veq)
 
@@ -41,16 +46,15 @@ def doppler_spec(doppler_wav):
 
 
 @pytest.fixture
-def doppler_surface():
-    return DopplerSurface(theta, veq=veq)
+def doppler_surface(ylm, doppler_wav, doppler_spec):
+    return DopplerSurface(ylm, doppler_wav, doppler_spec, theta, veq=veq)
 
 
-def test_light_curve(starry_doppler_map, doppler_wav, doppler_spec, doppler_surface):
+def test_light_curve(starry_doppler_map, doppler_surface):
     # starry light curve
     lc_starry = starry_doppler_map.flux(theta, normalize=False)
 
     # calculated light curve
-    y_j = Ylm.from_dense(y_)
-    lc_j = light_curve(y_j, doppler_wav, doppler_spec, doppler_surface)
+    lc_j = light_curve(doppler_surface)
 
     assert_allclose(lc_starry, lc_j)

@@ -93,6 +93,13 @@ spectrum = (
 
 # Load the component maps.
 map.load(spectra=spectrum, smoothing=0.075)
+with open(f"{CWD}/tests/spot_y.npy", "rb") as f:
+    map._y = np.load(f)
+
+# image = str(CWD + "/tests/spot.png")
+# map.load(maps=[image], spectra=spectrum, smoothing=0.075)
+# with open(f"{CWD}/tests/spot_y.npy", "wb") as f:
+#     np.save(f, map._y)
 
 # Get rotational phases.
 theta = np.linspace(-180, 180, map.nt, endpoint=False)
